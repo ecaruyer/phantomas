@@ -1,0 +1,20 @@
+{
+  "fiber_geometries" : {
+    "planar_fiber": {
+      "control_points":
+        [-10.0 ,  0.0 , 0.0,
+          -5.0 ,  0.0 , 0.0,
+           0.0 ,  5.0 , 0.0,
+           5.0 ,  0.0 , 0.0,
+           7.07, -7.07, 0.0],
+      "tangents": "symmetric",
+      "radius": 2.0
+    }
+  },
+  "isotropic_regions": {
+    "region1": {
+      "radius" : 3.0,
+      "center": [0.0, 0.0, 0.0]
+    }
+  }
+}

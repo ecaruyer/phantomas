@@ -1,0 +1,147 @@
+#!/usr/bin/env python
+from __future__ import division
+import argparse
+import json
+import os
+import numpy as np
+from phantomas.geometry.fiber import FiberSource
+from phantomas.geometry.models import Fiber, IsotropicRegion
+from phantomas.mr_simul.partial_volume \
+    import (compute_affine_matrix,
+            compute_spherical_region_masks,
+            compute_fiber_masks,
+            compute_volume_fractions)
+from phantomas.mr_simul.image_formation \
+    import (relaxation_time_images,
+            mr_signal,
+            rician_noise)
+import nibabel as nib
+
+
+# Function to check if file exists
+def is_valid_file(parser, arg):
+    if not os.path.exists(arg):
+       parser.error("Cannot open file %s." % arg)
+    else:
+       return open(arg, 'r')
+
+
+# The command-line arguments parser.
+####################################
+description="Simulates T1- and T2-weighted images from the description of a phantom."
+
+parser = argparse.ArgumentParser(description=description)
+parser.add_argument('geometry',
+                    type=lambda x: is_valid_file(parser,x),
+                    help="A JSON-formatted file describing fiber and "
+                         "phantom geometries.")
+parser.add_argument('-o', dest="output_dir", default=".",
+                    help="Output directory.")
+parser.add_argument('--res', type=float, default=1.0,
+                    help="Structural (T1 and T2) images resolution in mm.")
+parser.add_argument('--fov', type=float, default=None, 
+                    help="Field of view in mm. If None, adapts to the size "
+                         "of the phantom.")
+parser.add_argument('--snr', type=float, default=100.,
+                    help="Signal-to-noise ratio of the simulated images. "
+                         "0.0 for noise-free images")
+args = parser.parse_args()
+
+
+print "Reading geometry description..."
+#######################################
+geometry = json.load(args.geometry)
+
+# Read fiber bundles
+fibers_dict = geometry.get("fiber_geometries", {})
+nb_points = 100
+ts = np.linspace(0, 1., nb_points)
+fibers = []
+for fiber_name, fiber_params in fibers_dict.items():
+    control_points = np.asarray(fiber_params["control_points"])
+    nb_control_points = len(control_points) // 3
+    control_points = control_points.reshape((nb_control_points, 3))
+    radius = fiber_params["radius"]
+    tangents_mode = fiber_params.get("tangents", "symmetric")
+    f = FiberSource(control_points, tangents=tangents_mode)
+    fiber = Fiber('from_points', points=f(ts), radius=radius)
+    fibers.append(fiber)
+
+# Read Isotropic regions
+regions_dict = geometry.get("isotropic_regions", {})
+region_centers = []
+region_radii = []
+for region_name, region_params in regions_dict.items():
+    center = np.asarray(region_params["center"])
+    region_centers.append(center)
+    radius = region_params["radius"]
+    region_radii.append(radius)
+print "Found %d regions." % len(region_centers)
+
+# Read other phantom parameters
+phantom_radius = geometry.get("phantom_radius", None)
+if phantom_radius == None:
+    fiber = fibers[0].get_points()
+    phantom_radius = np.linalg.norm(fiber[0])
+
+phantom_fov = args.fov
+if phantom_fov == None:
+    phantom_fov = 2.2 * phantom_radius
+
+
+print "Preparing T1- and T2-weighted images..."
+###############################################
+print "\tComputing mask for each structure."
+affine = compute_affine_matrix(args.res, phantom_fov)
+phantom_center = np.array([0., 0., 0.])
+region_masks = compute_spherical_region_masks(region_centers, region_radii,
+                                              args.res, phantom_fov)
+fiber_masks = compute_fiber_masks(fibers, args.res, phantom_fov)
+gm_mask = compute_spherical_region_masks([phantom_center], 
+                                         [phantom_radius], args.res, 
+                                         phantom_fov)[..., 0]
+
+print "\tComputing volume fraction for each tissue type."
+background_vf, gm_vf, wm_vf, csf_vf = \
+    compute_volume_fractions(np.asarray([0, 0, 0,]), phantom_radius, gm_mask,
+                             fibers, fiber_masks,
+                             region_centers, region_radii, region_masks,
+                             args.res, phantom_fov)
+
+print "\tPreparing relaxation time fields for each tissue."
+image_shape = gm_mask.shape
+wm_t1, wm_t2 = relaxation_time_images(image_shape, 'wm')
+gm_t1, gm_t2 = relaxation_time_images(image_shape, 'gm')
+csf_t1, csf_t2 = relaxation_time_images(image_shape, 'csf')
+
+print "\tSimulate T1- and T2-weighted images"
+short_te, long_te = 0.01, 0.09
+short_tr, long_tr = 0.1, 5.0
+
+t1_weighted = mr_signal(wm_vf, wm_t1, wm_t2,
+              gm_vf, gm_t1, gm_t2,
+              csf_vf, csf_t1, csf_t2,
+              short_te, short_tr)
+
+t2_weighted = mr_signal(wm_vf, wm_t1, wm_t2,
+              gm_vf, gm_t1, gm_t2,
+              csf_vf, csf_t1, csf_t2,
+              long_te, long_tr)
+
+print "\tCorrupt images by Rician noise"
+if args.snr > 0.:
+    sigma = 1 / args.snr
+    t1_weighted = rician_noise(t1_weighted, sigma)
+    t2_weighted = rician_noise(t2_weighted, sigma)
+
+print "\tChange image type to INT16"
+scale = 2 ** 14
+t1_weighted = np.asarray(scale * t1_weighted, dtype=np.int16)
+t2_weighted = np.asarray(scale * t2_weighted, dtype=np.int16)
+
+print "\tWrite images to disk"
+t1_weighted_img = nib.Nifti1Image(t1_weighted, affine)
+nib.save(t1_weighted_img, os.path.join(args.output_dir, "t1_weighted.nii.gz"))
+
+t2_weighted_img = nib.Nifti1Image(t2_weighted, affine)
+nib.save(t2_weighted_img, os.path.join(args.output_dir, "t2_weighted.nii.gz"))

@@ -1,0 +1,102 @@
+#!/usr/bin/env python
+from __future__ import division
+import argparse
+import json
+import os
+import numpy as np
+from phantomas.geometry.fiber import FiberSource
+from phantomas.geometry.models import Fiber, IsotropicRegion
+from phantomas.visu.views import *
+import vtk
+
+
+# Function to check if file exists
+def is_valid_file(parser, arg):
+    if not os.path.exists(arg):
+       parser.error("Cannot open file %s." % arg)
+    else:
+       return open(arg, 'r')
+
+
+# The command-line arguments parser.
+####################################
+description="Renders fiber and isotropic regions from the description of a phantom."
+
+parser = argparse.ArgumentParser(description=description)
+parser.add_argument('geometry',
+                    type=lambda x: is_valid_file(parser,x),
+                    help="A JSON-formatted file describing fiber and "
+                         "phantom geometries.")
+args = parser.parse_args()
+
+ren = vtk.vtkRenderer()
+
+colors = ['#FF1E00', '#FFB300', '#1533AD', '#00BF32', '#BF4030', 
+          '#BF9430', '#2C3D82', '#248F40', '#A61300', '#A67400', 
+          '#071C71', '#007C21', '#FF5640', '#FFC640', '#4965D6', 
+          '#38DF64', '#FF8373', '#FFD573', '#6F83D6', '#64DF85',
+          '#FF5600', '#FF7C00', '#04859D', '#00AA72',   
+          '#BF6030', '#BF7630', '#206876', '#207F60',   
+          '#A63800', '#A65100', '#015666', '#006E4A',   
+          '#FF8040', '#FF9D40', '#37B6CE', '#35D4A0',   
+          '#FFA273', '#FFB773', '#5FBDCE', '#60D4AE']   
+
+color = iter(colors)
+
+print "Reading geometry description..."
+#######################################
+geometry = json.load(args.geometry)
+
+# Read fiber bundles
+fibers_dict = geometry.get("fiber_geometries", {})
+nb_points = 100
+ts = np.linspace(0, 1., nb_points)
+fibers = []
+for fiber_name, fiber_params in fibers_dict.items():
+    control_points = np.asarray(fiber_params["control_points"])
+    nb_control_points = len(control_points) // 3
+    control_points = control_points.reshape((nb_control_points, 3))
+    radius = fiber_params["radius"]
+    tangents_mode = fiber_params.get("tangents", "symmetric")
+    f = FiberSource(control_points, tangents=tangents_mode)
+    fiber = Fiber('from_points', points=f(ts), radius=radius)
+    fibers.append(fiber)
+    view = ViewFiber(fiber, ren, color=color.next(), label=fiber_name)
+
+# Read Isotropic regions
+regions_dict = geometry.get("isotropic_regions", {})
+region_centers = []
+region_radii = []
+for region_name, region_params in regions_dict.items():
+    center = np.asarray(region_params["center"])
+    region_centers.append(center)
+    radius = region_params["radius"]
+    region_radii.append(radius)
+    isotropic_region = IsotropicRegion(radius, center)
+    view = ViewIsotropicRegion(isotropic_region, ren, color=color.next(), 
+                               label=region_name)
+
+# Read other phantom parameters
+phantom_radius = geometry.get("phantom_radius", None)
+if phantom_radius == None:
+    fiber = fibers[0].get_points()
+    phantom_radius = np.linalg.norm(fiber[0])
+
+view = ViewSphere(phantom_radius, ren, opacity=0.3)
+
+renwin = vtk.vtkRenderWindow()
+renwin.SetSize(600, 600)
+renwin.AddRenderer(ren)
+
+iren = vtk.vtkRenderWindowInteractor()
+style = vtk.vtkInteractorStyleTrackballCamera()
+iren.SetInteractorStyle(style)
+iren.SetRenderWindow(renwin)
+
+cam = ren.GetActiveCamera()
+cam.SetPosition(0, 5. * phantom_radius, 0)
+cam.SetFocalPoint(0, 0, 0)
+cam.SetViewUp(0, 0, 1)
+
+renwin.Render()
+iren.Start()

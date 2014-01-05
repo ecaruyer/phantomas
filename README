@@ -1,4 +1,39 @@
-phantomas
+Phantomas
 =========
+Phantomas is an open-source software library for the creation of realistic
+phantoms in diffusion MRI. This is intented as a tool for the validation of
+methods in acquisition, signal and image processing, local reconstruction and
+fiber tracking in diffusion MRI. Phantomas is released under the terms of the
+revised BSD license. You should have received a copy of the license together
+with the software, please refer to the file ''LICENSE''.
 
-Create realistic digital phantoms in diffusion MRI.
+
+Dependencies
+------------
+Phantomas is written in Python with parts in C. You will need Python 2.7,
+and Cython installed on your computer.
+
+Besides, Phantomas depends on:
+- numpy, 
+- scipy, 
+- scikits-sparse
+
+Optionally, you may also need:
+- vtk,
+- matplotlib.
+
+
+Build instructions
+------------------
+Under linux, simply run (as root) 
+
+# python setup.py install
+
+
+Getting started
+---------------
+Phantomas provides a number of scripts, and examples. The main script is
+phantomas_dwis. For more info, type:
+
+$ phantomas_dwis -h
+

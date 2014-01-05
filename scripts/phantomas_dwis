@@ -1,0 +1,233 @@
+#!/usr/bin/env python
+from __future__ import division
+import argparse
+import json
+import os
+import numpy as np
+from phantomas.geometry.fiber import FiberSource
+from phantomas.geometry.models import Fiber, IsotropicRegion
+from phantomas.mr_simul.partial_volume \
+    import (compute_affine_matrix,
+            compute_spherical_region_masks,
+            compute_fiber_masks,
+            compute_volume_fractions)
+from phantomas.mr_simul.image_formation \
+    import (relaxation_time_images,
+            mr_signal,
+            rician_noise)
+from phantomas.mr_simul.fod import compute_directions, compute_fod
+from phantomas.utils import shm
+from phantomas.mr_simul.synthetic import GaussianModel
+import nibabel as nib
+import sys
+from sets import Set
+
+
+# Function to check if file exists
+def is_valid_file(parser, arg):
+    if not os.path.exists(arg):
+       parser.error("Cannot open file %s." % arg)
+    else:
+       return open(arg, 'r')
+
+
+# The command-line arguments parser.
+####################################
+description="Simulates diffusion-weighted images from the description of a " \
+            "phantom."
+
+parser = argparse.ArgumentParser(description=description)
+parser.add_argument('geometry',
+                    type=lambda x: is_valid_file(parser,x),
+                    help="A JSON-formatted file describing fiber and phantom "
+                         "geometries.")
+parser.add_argument('-b', dest='bvals', required=True,
+                    help="b-values in a text file.")
+parser.add_argument('-r', dest='bvecs', required=True,
+                    help="b-vectors in a text file.")
+parser.add_argument('-o', dest="output_dir", default=".",
+    help="Output directory.")
+parser.add_argument('--res', type=float, default=2.0,
+    help="Diffusion-weighted images resolution in mm.")
+parser.add_argument('--fov', type=float, default=None, 
+                    help="Field of view in mm. If None, adapts to the size "
+                         "of the phantom.")
+parser.add_argument('--snr', type=float, default=100.,
+                    help="Signal-to-noise ratio of the simulated images. "
+                         "0.0 for noise-free images")
+args = parser.parse_args()
+
+
+print "Reading geometry description..."
+#######################################
+geometry = json.load(args.geometry)
+
+# Read fiber bundles
+fibers_dict = geometry.get("fiber_geometries", {})
+nb_points = 100
+ts = np.linspace(0, 1., nb_points)
+fibers = []
+fiber_trajectories = []
+fiber_tangents = []
+fiber_radii = []
+for fiber_name, fiber_params in fibers_dict.items():
+    control_points = np.asarray(fiber_params["control_points"])
+    nb_control_points = len(control_points) // 3
+    control_points = control_points.reshape((nb_control_points, 3))
+    radius = fiber_params["radius"]
+    tangents_mode = fiber_params.get("tangents", "symmetric")
+    f = FiberSource(control_points, tangents=tangents_mode)
+    fiber = Fiber('from_points', points=f(ts), radius=radius)
+    fibers.append(fiber)
+    fiber_trajectories.append(f(ts))
+    fiber_tangents.append(f.tangents(ts))
+    fiber_radii.append(radius)
+
+# Read Isotropic regions
+regions_dict = geometry.get("isotropic_regions", {})
+region_centers = []
+region_radii = []
+for region_name, region_params in regions_dict.items():
+    center = np.asarray(region_params["center"])
+    region_centers.append(center)
+    radius = region_params["radius"]
+    region_radii.append(radius)
+print "Found %d regions." % len(region_centers)
+
+# Read other phantom parameters
+phantom_radius = geometry.get("phantom_radius", None)
+if phantom_radius == None:
+    fiber = fibers[0].get_points()
+    phantom_radius = np.linalg.norm(fiber[0])
+
+phantom_fov = args.fov
+if phantom_fov == None:
+    phantom_fov = 2.2 * phantom_radius
+
+
+print "Preparing diffusion-weighted images..."
+###############################################
+
+print "\tComputing mask for each structure."
+affine = compute_affine_matrix(args.res, phantom_fov)
+phantom_center = np.array([0., 0., 0.])
+region_masks = compute_spherical_region_masks(region_centers, region_radii,
+                                              args.res, phantom_fov)
+fiber_masks = compute_fiber_masks(fibers, args.res, phantom_fov)
+gm_mask = compute_spherical_region_masks([phantom_center], 
+                                         [phantom_radius], args.res, 
+                                         phantom_fov)[..., 0]
+
+
+print "\tComputing volume fraction for each tissue type."
+background_vf, gm_vf, wm_vf, csf_vf = \
+    compute_volume_fractions(np.asarray([0, 0, 0,]), phantom_radius, gm_mask,
+                             fibers, fiber_masks,
+                             region_centers, region_radii, region_masks,
+                             args.res, phantom_fov)
+
+
+print "\tPreparing relaxation time fields for each tissue."
+image_shape = gm_mask.shape
+dim_x, dim_y, dim_z = image_shape
+wm_t1, wm_t2 = relaxation_time_images(image_shape, 'wm')
+gm_t1, gm_t2 = relaxation_time_images(image_shape, 'gm')
+csf_t1, csf_t2 = relaxation_time_images(image_shape, 'csf')
+
+
+print "\tComputing fiber orientation distribution."
+order_sh = 8
+dim_sh = shm.dimension(order_sh)
+fods = np.zeros((dim_x, dim_y, dim_z, dim_sh))
+wm_mask = np.any(fiber_masks > 0, axis=-1)
+wm_indices = np.nonzero(wm_mask)
+resolution = 9
+for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
+    voxel_center = np.dot(affine, np.asarray([i, j, k, 1.0]))[:3]
+    fiber_indices = np.nonzero(fiber_masks[i, j, k])[0]
+    fod_samples, fod_weights = compute_directions(
+        [fiber_trajectories[n] for n in fiber_indices], 
+        [fiber_tangents[n] for n in fiber_indices], 
+        [fiber_radii[n] for n in fiber_indices], 
+        voxel_center, args.res, resolution)
+    fod_weights /= fod_weights.sum()
+    fods[i, j, k] = compute_fod(fod_samples, fod_weights, kappa=50, sh=True, 
+                                order_sh=order_sh)
+
+
+print "\tReading acquisition sequence..."
+bvals = np.loadtxt(args.bvals)
+bvecs = np.loadtxt(args.bvecs)
+nb_acquisitions = bvals.shape[0]
+if bvecs.shape[1] != 3:
+    if bvecs.shape[0] != 3:
+        sys.stderr.write("The .bvec file should contain 3d vectors.")
+        sys.exit(1)
+    bvecs = bvecs.T
+indices_dwis = (bvals > 0)
+gradient_directions = bvecs[indices_dwis]
+gradient_bvals = bvals[indices_dwis]
+np.clip(gradient_directions, -1, 1, gradient_directions)
+
+
+print "\tPrepare synthetic model of diffusion and convolution with FOD."
+lambda1 = 1.7e-3
+lambda2 = 0.2e-2
+model = GaussianModel(lambda1, lambda2)
+
+signal_operators = {}
+tau = 50e-3 # diffusion time: 50ms
+unique_bvals = set(bvals[indices_dwis].tolist())
+gradient_theta = np.arccos(gradient_directions[:, 0])
+gradient_phi = np.arctan2(gradient_directions[:, 2], gradient_directions[:, 1])
+H = shm.matrix(gradient_theta, gradient_phi, order=order_sh)
+for bval in unique_bvals:
+    qnorm = np.sqrt(bval / (4 * np.pi**2 * tau))
+    rs = model.signal_convolution_sh(order_sh, qnorm, tau)
+    indices = (gradient_bvals == bval)
+    H[indices] *= rs[np.newaxis, :]
+
+
+print "\tCompute diffusion signal attenuation."
+wm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions))
+wm_attenuation[..., indices_dwis] = np.dot(fods , H.T)
+
+gm_diffusivity = 0.2e-3
+gm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
+    * np.exp(-bvals * gm_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
+
+csf_diffusivity = 3.0e-3
+csf_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
+    * np.exp(-bvals * csf_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
+
+print "\tCompute diffusion-weighted images"
+te, tr = 0.09, 5.0
+b0_wm = mr_signal(wm_vf, wm_t1, wm_t2,
+                  0 * gm_vf, gm_t1, gm_t2,
+                  0 * csf_vf, csf_t1, csf_t2,
+                  te, tr)
+b0_gm = mr_signal(0 * wm_vf, wm_t1, wm_t2,
+                  gm_vf, gm_t1, gm_t2,
+                  0 * csf_vf, csf_t1, csf_t2,
+                  te, tr)
+b0_csf = mr_signal(0 * wm_vf, wm_t1, wm_t2,
+                   0 * gm_vf, gm_t1, gm_t2,
+                   csf_vf, csf_t1, csf_t2,
+                   te, tr)
+dwis = b0_wm[..., np.newaxis] * wm_attenuation \
+     + b0_gm[..., np.newaxis] * gm_attenuation \
+     + b0_csf[..., np.newaxis] * csf_attenuation
+
+print "\tCorrupt images by Rician noise"
+if args.snr > 0.:
+    sigma = 1 / args.snr
+    dwis = rician_noise(dwis, sigma)
+
+print "\tChange image type to INT16"
+scale = 2 ** 14
+dwis = np.asarray(scale * dwis, dtype=np.int16)
+
+print "\tWrite images to disk"
+dwis_img = nib.Nifti1Image(dwis, affine)
+nib.save(dwis_img, os.path.join(args.output_dir, "dwis.nii.gz"))
+

@@ -1,0 +1,7 @@
+CHANGELOG
+---------
+
++ v0.1
+|___ Simulation of T1/T2 images
+|___ Estimation of volume fractions in native python
+|___ Computation of FODs in Cython
