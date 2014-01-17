@@ -49,7 +49,7 @@ parser.add_argument('-o', dest="output_dir", default=".",
     help="Output directory.")
 parser.add_argument('--res', type=float, default=2.0,
     help="Diffusion-weighted images resolution in mm.")
-parser.add_argument('--fov', type=float, default=None, 
+parser.add_argument('--fov', type=float, default=None,
                     help="Field of view in mm. If None, adapts to the size "
                          "of the phantom.")
 parser.add_argument('--snr', type=float, default=100.,
@@ -105,6 +105,21 @@ if phantom_fov == None:
     phantom_fov = 2.2 * phantom_radius
 
 
+print "\tReading acquisition sequence..."
+bvals = np.loadtxt(args.bvals)
+bvecs = np.loadtxt(args.bvecs)
+nb_acquisitions = bvals.shape[0]
+if bvecs.shape[1] != 3:
+    if bvecs.shape[0] != 3:
+        sys.stderr.write("The .bvec file should contain 3d vectors.")
+        sys.exit(1)
+    bvecs = bvecs.T
+indices_dwis = (bvals > 0)
+gradient_directions = bvecs[indices_dwis]
+gradient_bvals = bvals[indices_dwis]
+np.clip(gradient_directions, -1, 1, gradient_directions)
+
+
 print "Preparing diffusion-weighted images..."
 ###############################################
 
@@ -114,8 +129,8 @@ phantom_center = np.array([0., 0., 0.])
 region_masks = compute_spherical_region_masks(region_centers, region_radii,
                                               args.res, phantom_fov)
 fiber_masks = compute_fiber_masks(fibers, args.res, phantom_fov)
-gm_mask = compute_spherical_region_masks([phantom_center], 
-                                         [phantom_radius], args.res, 
+gm_mask = compute_spherical_region_masks([phantom_center],
+                                         [phantom_radius], args.res,
                                          phantom_fov)[..., 0]
 
 
@@ -146,28 +161,13 @@ for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
     voxel_center = np.dot(affine, np.asarray([i, j, k, 1.0]))[:3]
     fiber_indices = np.nonzero(fiber_masks[i, j, k])[0]
     fod_samples, fod_weights = compute_directions(
-        [fiber_trajectories[n] for n in fiber_indices], 
-        [fiber_tangents[n] for n in fiber_indices], 
-        [fiber_radii[n] for n in fiber_indices], 
+        [fiber_trajectories[n] for n in fiber_indices],
+        [fiber_tangents[n] for n in fiber_indices],
+        [fiber_radii[n] for n in fiber_indices],
         voxel_center, args.res, resolution)
     fod_weights /= fod_weights.sum()
-    fods[i, j, k] = compute_fod(fod_samples, fod_weights, kappa=50, sh=True, 
+    fods[i, j, k] = compute_fod(fod_samples, fod_weights, kappa=50, sh=True,
                                 order_sh=order_sh)
-
-
-print "\tReading acquisition sequence..."
-bvals = np.loadtxt(args.bvals)
-bvecs = np.loadtxt(args.bvecs)
-nb_acquisitions = bvals.shape[0]
-if bvecs.shape[1] != 3:
-    if bvecs.shape[0] != 3:
-        sys.stderr.write("The .bvec file should contain 3d vectors.")
-        sys.exit(1)
-    bvecs = bvecs.T
-indices_dwis = (bvals > 0)
-gradient_directions = bvecs[indices_dwis]
-gradient_bvals = bvals[indices_dwis]
-np.clip(gradient_directions, -1, 1, gradient_directions)
 
 
 print "\tPrepare synthetic model of diffusion and convolution with FOD."
@@ -176,7 +176,7 @@ lambda2 = 0.2e-2
 model = GaussianModel(lambda1, lambda2)
 
 signal_operators = {}
-tau = 50e-3 # diffusion time: 50ms
+tau = 50e-3  # diffusion time: 50ms
 unique_bvals = set(bvals[indices_dwis].tolist())
 gradient_theta = np.arccos(gradient_directions[:, 0])
 gradient_phi = np.arctan2(gradient_directions[:, 2], gradient_directions[:, 1])
@@ -190,7 +190,7 @@ for bval in unique_bvals:
 
 print "\tCompute diffusion signal attenuation."
 wm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions))
-wm_attenuation[..., indices_dwis] = np.dot(fods , H.T)
+wm_attenuation[..., indices_dwis] = np.dot(fods, H.T)
 
 gm_diffusivity = 0.2e-3
 gm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
@@ -199,6 +199,7 @@ gm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
 csf_diffusivity = 3.0e-3
 csf_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
     * np.exp(-bvals * csf_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
+
 
 print "\tCompute diffusion-weighted images"
 te, tr = 0.09, 5.0
@@ -230,4 +231,3 @@ dwis = np.asarray(scale * dwis, dtype=np.int16)
 print "\tWrite images to disk"
 dwis_img = nib.Nifti1Image(dwis, affine)
 nib.save(dwis_img, os.path.join(args.output_dir, "dwis.nii.gz"))
-
