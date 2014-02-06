@@ -172,14 +172,14 @@ for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
 
 print "\tPrepare synthetic model of diffusion and convolution with FOD."
 lambda1 = 1.7e-3
-lambda2 = 0.2e-2
+lambda2 = 0.2e-3
 model = GaussianModel(lambda1, lambda2)
 
 signal_operators = {}
 tau = 50e-3  # diffusion time: 50ms
 unique_bvals = set(bvals[indices_dwis].tolist())
-gradient_theta = np.arccos(gradient_directions[:, 0])
-gradient_phi = np.arctan2(gradient_directions[:, 2], gradient_directions[:, 1])
+gradient_theta = np.arccos(gradient_directions[:, 2])
+gradient_phi = np.arctan2(gradient_directions[:, 1], gradient_directions[:, 0])
 H = shm.matrix(gradient_theta, gradient_phi, order=order_sh)
 for bval in unique_bvals:
     qnorm = np.sqrt(bval / (4 * np.pi**2 * tau))
