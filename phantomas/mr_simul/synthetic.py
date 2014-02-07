@@ -149,6 +149,7 @@ class GaussianModel(AxiallySymmetricModel):
         """
         bvals = 4 * np.pi**2 * qnorms**2 * tau
         signal = np.exp(-bvals * self.lambda2)
-        signal *= np.exp(-bvals * (self.lambda1 - self.lambda2))
+        signal *= np.exp(-bvals * (self.lambda1 - self.lambda2) \
+                         * np.cos(thetas)**2)
 
         return signal
