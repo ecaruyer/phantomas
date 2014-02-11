@@ -7,21 +7,33 @@ import numpy as np
 from ..mr_simul.partial_volume import compute_corner_positions
 
 
-
-def cortical_shell_mask(voxel_size, image_size, phantom_center, phantom_radius,
-                        shell_thickness):
+def spherical_shell_mask(voxel_size, image_size, center, radius,
+                         shell_thickness):
     """
-    Returns a mask of a cortical shell.
+    Returns a mask of a spherical shell, with selected (outer) radius and 
+    thickness.
+
+    Parameters
+    ----------
+    voxel_size : double
+        voxel size in mm (only isotropic voxels are supported).
+    image_size : double
+        image size in mm (we assume image has cubic shape).
+    center : array-like, shape (3, )
+    radius : double
+        spherical shell outer radius in mm.
+    shell_thickness : double
+        spherical shell thickness in mm.
     """
     dim_x = dim_y = dim_z = int(image_size / voxel_size)
 
     corner_positions = compute_corner_positions(voxel_size, image_size)
 
-    center_to_corners = corner_positions - phantom_center
+    center_to_corners = corner_positions - center
     dst_to_corners = (point_to_corners ** 2).sum(-1)
 
-    out_radius = phantom_radius
-    in_radius = phantom_radius - shell_thickness
+    out_radius = radius
+    in_radius = radius - shell_thickness
 
     corner_indices = [[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1],
                       [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]]
