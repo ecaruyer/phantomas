@@ -55,6 +55,12 @@ parser.add_argument('--fov', type=float, default=None,
 parser.add_argument('--snr', type=float, default=100.,
                     help="Signal-to-noise ratio of the simulated images. "
                          "0.0 for noise-free images")
+parser.add_argument('--seed', type=float, default=None,
+                    help="Seed for the random number generator of the tissue relaxation time.")
+parser.add_argument('--seedr1', type=float, default=None,
+                    help="Seed for the random number generator of the first gaussian for the rician noise generator.")
+parser.add_argument('--seedr2', type=float, default=None,
+                    help="Seed for the random number generator of the first gaussian for the rician noise generator.")
 args = parser.parse_args()
 
 
@@ -119,7 +125,6 @@ gradient_directions = bvecs[indices_dwis]
 gradient_bvals = bvals[indices_dwis]
 np.clip(gradient_directions, -1, 1, gradient_directions)
 
-
 print "Preparing diffusion-weighted images..."
 ###############################################
 
@@ -145,9 +150,9 @@ background_vf, gm_vf, wm_vf, csf_vf = \
 print "\tPreparing relaxation time fields for each tissue."
 image_shape = gm_mask.shape
 dim_x, dim_y, dim_z = image_shape
-wm_t1, wm_t2 = relaxation_time_images(image_shape, 'wm')
-gm_t1, gm_t2 = relaxation_time_images(image_shape, 'gm')
-csf_t1, csf_t2 = relaxation_time_images(image_shape, 'csf')
+wm_t1, wm_t2 = relaxation_time_images(image_shape, 'wm', args.seed)
+gm_t1, gm_t2 = relaxation_time_images(image_shape, 'gm', args.seed)
+csf_t1, csf_t2 = relaxation_time_images(image_shape, 'csf', args.seed)
 
 
 print "\tComputing fiber orientation distribution."
@@ -172,14 +177,14 @@ for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
 
 print "\tPrepare synthetic model of diffusion and convolution with FOD."
 lambda1 = 1.7e-3
-lambda2 = 0.2e-2
+lambda2 = 0.2e-3
 model = GaussianModel(lambda1, lambda2)
 
 signal_operators = {}
 tau = 50e-3  # diffusion time: 50ms
 unique_bvals = set(bvals[indices_dwis].tolist())
-gradient_theta = np.arccos(gradient_directions[:, 0])
-gradient_phi = np.arctan2(gradient_directions[:, 2], gradient_directions[:, 1])
+gradient_theta = np.arccos(gradient_directions[:, 2])
+gradient_phi = np.arctan2(gradient_directions[:, 1], gradient_directions[:, 0])
 H = shm.matrix(gradient_theta, gradient_phi, order=order_sh)
 for bval in unique_bvals:
     qnorm = np.sqrt(bval / (4 * np.pi**2 * tau))
@@ -200,6 +205,9 @@ csf_diffusivity = 3.0e-3
 csf_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
     * np.exp(-bvals * csf_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
 
+#print(np.max(wm_attenuation,axis=-1), np.max(gm_attenuation,axis=-1), np.max(csf_attenuation,axis=-1))
+#print(np.max(np.dot(fods, H.T),axis=-1), np.max(np.exp(-bvals * gm_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :],axis=-1), np.max(np.exp(-bvals * csf_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :],axis=-1))
+#print wm_attenuation
 
 print "\tCompute diffusion-weighted images"
 te, tr = 0.09, 5.0
@@ -222,7 +230,7 @@ dwis = b0_wm[..., np.newaxis] * wm_attenuation \
 print "\tCorrupt images by Rician noise"
 if args.snr > 0.:
     sigma = 1 / args.snr
-    dwis = rician_noise(dwis, sigma)
+    dwis = rician_noise(dwis, sigma, args.seedr1, args.seedr2)
 
 print "\tChange image type to INT16"
 scale = 2 ** 14
