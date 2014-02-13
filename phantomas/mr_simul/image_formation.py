@@ -184,7 +184,7 @@ def rician_noise(image, sigma, seed1=None, seed2=None):
     sigma : double
     seed1 : the seed to use for the random number generator of the
         first gaussian, default : None
-    seed1 : the seed to use for the random number generator of the
+    seed2 : the seed to use for the random number generator of the
         second gaussian, default : None
     """
     RNG1 = np.random.RandomState(seed1)
