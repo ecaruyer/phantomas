@@ -196,6 +196,9 @@ print "\tCompute diffusion signal attenuation."
 wm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions))
 wm_attenuation[..., indices_dwis] = np.dot(fods, H.T)
 
+wm_attenuation_img = nib.Nifti1Image(wm_attenuation, affine)
+nib.save(wm_attenuation_img, "wm_attenuation.nii.gz")
+
 gm_diffusivity = 0.2e-3
 gm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
     * np.exp(-bvals * gm_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
