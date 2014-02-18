@@ -15,7 +15,7 @@ import scipy.sparse as scisp
 from scikits.sparse.cholmod import cholesky
 
 
-def _random_correlated_image(mean, sigma, image_shape, alpha=0.3):
+def _random_correlated_image(mean, sigma, image_shape, alpha=0.3, rng=None):
     """
     Creates a random image with correlated neighbors.
     pixel covariance is sigma^2, direct neighors pixel covariance is alpha * sigma^2.
@@ -26,6 +26,7 @@ def _random_correlated_image(mean, sigma, image_shape, alpha=0.3):
     sigma : the std dev of image pixel values.
     image_shape : tuple, shape = (3, )
     alpha : the neighbors correlation factor.
+    rng : random number generator (a numpy.random.RandomState instance).
     """
     dim_x, dim_y, dim_z = image_shape
     dim_image = dim_x * dim_y * dim_z
@@ -62,7 +63,7 @@ def _random_correlated_image(mean, sigma, image_shape, alpha=0.3):
         
         sq_correlation = P.dot(L)
         
-        X = np.random.normal(0, 1, dim_image)
+        X = rng.normal(0, 1, dim_image)
         Y = sq_correlation.dot(X)
         Y = Y.reshape((dim_x, dim_y, dim_z))
         X = X.reshape((dim_x, dim_y, dim_z))
@@ -90,7 +91,7 @@ _physical_parameters = {
 }
 
 
-def relaxation_time_images(image_shape, tissue_type):
+def relaxation_time_images(image_shape, tissue_type, rng=None):
     """
     Return randomly generated images of t1 and t2 relaxation times, of 
     desired shape, for the desired tissue type.
@@ -109,13 +110,15 @@ def relaxation_time_images(image_shape, tissue_type):
         T1 relaxation time image.
     t2 : array-like, shape ``(dim_x, dim_y, dim_z)``
         T2 relaxation time image.
+    rng : int
+        random number generator (a numpy.random.RandomState instance).
     """
     t1 = _random_correlated_image(_physical_parameters[tissue_type]['t1']['mean'], 
                                  _physical_parameters[tissue_type]['t1']['stddev'],
-                                 image_shape)
+                                 image_shape, rng=rng)
     t2 = _random_correlated_image(_physical_parameters[tissue_type]['t2']['mean'], 
                                  _physical_parameters[tissue_type]['t2']['stddev'],
-                                 image_shape)
+                                 image_shape, rng=rng)
     return t1, t2
 
 
@@ -171,7 +174,7 @@ def mr_signal(wm_vf, wm_t1, wm_t2,
     return image
 
 
-def rician_noise(image, sigma):
+def rician_noise(image, sigma, rng=None):
     """
     Add Rician distributed noise to the input image.
 
@@ -182,7 +185,7 @@ def rician_noise(image, sigma):
     sigma : double
 
     """
-    n1 = np.random.normal(loc=0, scale=sigma, size=image.shape)
-    n2 = np.random.normal(loc=0, scale=sigma, size=image.shape)
+    n1 = rng.normal(loc=0, scale=sigma, size=image.shape)
+    n2 = rng.normal(loc=0, scale=sigma, size=image.shape)
     return np.sqrt((image + n1)**2 + n2**2)
 
