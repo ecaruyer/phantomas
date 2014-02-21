@@ -52,16 +52,16 @@ def spherical_shell_mask(voxel_size, image_size, center, radius,
     return mask_shell
 
 
-def _merge_patches(fibers):
+def _merge_patches(endpoints, radii):
     """
     From a set of fibers, identify the end points that need to be merged to
     define the connectivity rois.
 
     Parameters
     ----------
-    fibers : sequence
-        A list of phantomas.geometry.models.Fiber objects.
-    
+    endpoints : array-like, shape (nb_endpoints, 3)
+    radii : array-like, shape (nb_endpoints, )
+        
     Returns
     -------
     label_indices : sequence
@@ -73,16 +73,7 @@ def _merge_patches(fibers):
         therefore connectivity_matrix[i, j] indicates whether label (i + 1)
         is connected to label (j + 1).
     """
-    nb_endpoints = 2 * len(fibers)
-    endpoints = np.zeros((nb_endpoints, 3))
-    radii = np.zeros(nb_endpoints)
-    for i, fiber in enumerate(fibers):
-        fiber_points = fiber.get_points()
-        fiber_radius = fiber.get_radius()
-        endpoints[2 * i] = fiber_points[0]
-        endpoints[2 * i + 1] = fiber_points[-1]
-        radii[2 * i] = fiber_radius
-        radii[2 * i + 1] = fiber_radius
+    nb_endpoints = endpoints.shape[0]
     endpoints_to_center = np.sqrt(np.sum(endpoints ** 2, 1))
     thetas = np.arctan2(endpoints_to_center, radii)
     endpoints_norm = np.sqrt(np.sum(endpoints ** 2, 1))
@@ -95,29 +86,33 @@ def _merge_patches(fibers):
     angles -= thetas[:, np.newaxis]
     angles -= thetas[np.newaxis, :]
     
-    labels = [[i] for i in range(1, nb_endpoints + 1)]
-    nb_merged = 0 # The number of merged patches so far.
+    label_indices = []
     for i in range(nb_endpoints):
-        index_label = i - nb_merged
         merged = False
-        for j in range(index_label):
-            for id_endpoint in labels[j]:
-                if angles[i, id_endpoint] <= 0:
-                    # merge patch i to label j
-                    nb_merged += 1
-                    if not merged:
-                        # merge patch i to label j
-                        labels[j].append(i)
-                        labels.remove(labels[index_label])
-                        merged = True
-                        merged_to = j
-                    else:
-                        labels[merged_to].extend(labels[j])
-                        labels.remove(labels[j])
-    nb_labels = len(labels)
-    connectivity_matrix = np.zeros((nb_labels, nb_labels), dtype=np.bool)
-    
+        for label_index, label_endpoints in enumerate(label_indices):
+            for j in label_endpoints:
+                if angles[i, j] <= 0:
+                    label_indices[label_index].append(i)
+                    merged = True
+                    break
+        if not merged:
+            label_indices.append([i])
+    print label_indices
+    nb_labels = len(label_indices)
 
+    connectivity_matrix = np.zeros((nb_labels, nb_labels), dtype=np.bool)
+    for i in range(nb_labels):
+        patches_i = label_indices[i]
+        for j in range(i):
+            patches_j = label_indices[j]
+            for k in patches_i:
+                for l in patches_j:
+                    if (l % 2 == 0) and (k - l == 1) \
+                    or (k % 2 == 0) and (l - k == 1):
+                        connectivity_matrix[i, j] = 1
+                        connectivity_matrix[j, i] = 1
+    
+    return label_indices, connectivity_matrix
 
 
 def target_rois(fibers, voxel_size, image_size):
@@ -129,6 +124,10 @@ def target_rois(fibers, voxel_size, image_size):
     ----------
     fibers : sequence
         A list of phantomas.geometry.models.Fiber objects.
+    voxel_size : double
+        voxel size in mm (only isotropic voxels are supported).
+    image_size : double
+        image size in mm (we assume image has cubic shape).
 
     Returns
     -------
@@ -140,6 +139,46 @@ def target_rois(fibers, voxel_size, image_size):
         is connected to label (j + 1).
     """
     # We first identify the intersecting patches
-    
-    return
+    nb_endpoints = 2 * len(fibers)
+    endpoints = np.zeros((nb_endpoints, 3))
+    radii = np.zeros(nb_endpoints)
+    for i, fiber in enumerate(fibers):
+        fiber_points = fiber.get_points()
+        fiber_radius = fiber.get_radius()
+        endpoints[2 * i] = fiber_points[0]
+        endpoints[2 * i + 1] = fiber_points[-1]
+        radii[2 * i] = fiber_radius
+        radii[2 * i + 1] = fiber_radius
 
+    label_indices, connectivity_matrix = _merge_patches(endpoints, radii)
+    
+    mask_shell = spherical_shell_mask(voxel_size, image_size, center, radius,
+                         shell_thickness)
+    indices_shell = np.nonzero(mask_shell)
+
+    dim_x = dim_y = dim_z = int(image_size / voxel_size)
+    dim_image = dim_x * dim_y * dim_z
+    affine = compute_affine_matrix(voxel_size, image_size)
+
+    indices = np.mgrid[0:dim_x, 0:dim_y, 0:dim_z]
+    center_positions = np.dot(affine[:3, :3], indices.reshape(3, dim_image)).T \
+                     + affine[:3, 3]
+    shell_voxels = center_positions[mask_shell]
+
+    voxels_to_endpoints = (shell_voxels[:, 0, np.newaxis] \
+                         - endpoints[:, np.newaxis, 0])**2
+    voxels_to_endpoints += (shell_voxels[:, 1, np.newaxis] \
+                         - endpoints[:, np.newaxis, 1])**2
+    voxels_to_endpoints = (shell_voxels[:, 1, np.newaxis] \
+                         - endpoints[:, np.newaxis, 1])**2
+    np.sqrt(voxels_to_endpoints, out=voxels_to_endpoints)
+    voxels_to_endpoints -= radii[np.newaxis, :]
+ 
+    endpoint_indices = np.argmin(voxels_to_endpoints, axis=1)
+
+    labels = np.zeros(endpoint_indices.shape, dtype=np.char)
+    for label, endpoint_indices in enumerate(label_indices):
+        for endpoint_index in endpoint_indices:
+            labels[indices_shell[endpoint_indices == endpoint_index]] = label
+
+    return labels, connectivity_matrix
