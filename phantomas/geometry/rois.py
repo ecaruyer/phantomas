@@ -4,7 +4,8 @@ connectivity analyses.
 """
 from __future__ import division
 import numpy as np
-from ..mr_simul.partial_volume import compute_corner_positions
+from ..mr_simul.partial_volume import (compute_corner_positions, 
+                                       compute_affine_matrix)
 
 
 def spherical_shell_mask(voxel_size, image_size, center, radius,
@@ -30,7 +31,7 @@ def spherical_shell_mask(voxel_size, image_size, center, radius,
     corner_positions = compute_corner_positions(voxel_size, image_size)
 
     center_to_corners = corner_positions - center
-    dst_to_corners = (point_to_corners ** 2).sum(-1)
+    dst_to_corners = (center_to_corners ** 2).sum(-1)
 
     out_radius = radius
     in_radius = radius - shell_thickness
@@ -74,18 +75,21 @@ def _merge_patches(endpoints, radii):
         is connected to label (j + 1).
     """
     nb_endpoints = endpoints.shape[0]
-    endpoints_to_center = np.sqrt(np.sum(endpoints ** 2, 1))
-    thetas = np.arctan2(endpoints_to_center, radii)
     endpoints_norm = np.sqrt(np.sum(endpoints ** 2, 1))
+    thetas = np.arctan2(radii, endpoints_norm)
+
     angles  = np.outer(endpoints[:, 0] / endpoints_norm, 
                        endpoints[:, 0] / endpoints_norm)
     angles += np.outer(endpoints[:, 1] / endpoints_norm, 
                        endpoints[:, 1] / endpoints_norm)
     angles += np.outer(endpoints[:, 2] / endpoints_norm, 
                        endpoints[:, 2] / endpoints_norm)
+    np.clip(angles, -1, 1, out=angles)
+    np.arccos(angles, out=angles)
+
     angles -= thetas[:, np.newaxis]
     angles -= thetas[np.newaxis, :]
-    
+
     label_indices = []
     for i in range(nb_endpoints):
         merged = False
@@ -97,7 +101,6 @@ def _merge_patches(endpoints, radii):
                     break
         if not merged:
             label_indices.append([i])
-    print label_indices
     nb_labels = len(label_indices)
 
     connectivity_matrix = np.zeros((nb_labels, nb_labels), dtype=np.bool)
@@ -151,9 +154,13 @@ def target_rois(fibers, voxel_size, image_size):
         radii[2 * i + 1] = fiber_radius
 
     label_indices, connectivity_matrix = _merge_patches(endpoints, radii)
+
+    center = np.array([0, 0, 0])
+    radius = np.max(np.sqrt(np.sum(endpoints**2, -1)))
+    shell_thickness = voxel_size
     
     mask_shell = spherical_shell_mask(voxel_size, image_size, center, radius,
-                         shell_thickness)
+                                      shell_thickness)
     indices_shell = np.nonzero(mask_shell)
 
     dim_x = dim_y = dim_z = int(image_size / voxel_size)
@@ -161,24 +168,28 @@ def target_rois(fibers, voxel_size, image_size):
     affine = compute_affine_matrix(voxel_size, image_size)
 
     indices = np.mgrid[0:dim_x, 0:dim_y, 0:dim_z]
-    center_positions = np.dot(affine[:3, :3], indices.reshape(3, dim_image)).T \
+    indices = np.rollaxis(indices, 0, 4)
+    center_positions = np.dot(indices, affine[:3, :3].T) \
                      + affine[:3, 3]
     shell_voxels = center_positions[mask_shell]
 
     voxels_to_endpoints = (shell_voxels[:, 0, np.newaxis] \
-                         - endpoints[:, np.newaxis, 0])**2
+                         - endpoints[np.newaxis, :, 0])**2
     voxels_to_endpoints += (shell_voxels[:, 1, np.newaxis] \
-                         - endpoints[:, np.newaxis, 1])**2
-    voxels_to_endpoints = (shell_voxels[:, 1, np.newaxis] \
-                         - endpoints[:, np.newaxis, 1])**2
+                         - endpoints[np.newaxis, :, 1])**2
+    voxels_to_endpoints += (shell_voxels[:, 2, np.newaxis] \
+                         - endpoints[np.newaxis, :, 2])**2
     np.sqrt(voxels_to_endpoints, out=voxels_to_endpoints)
     voxels_to_endpoints -= radii[np.newaxis, :]
  
     endpoint_indices = np.argmin(voxels_to_endpoints, axis=1)
 
-    labels = np.zeros(endpoint_indices.shape, dtype=np.char)
-    for label, endpoint_indices in enumerate(label_indices):
-        for endpoint_index in endpoint_indices:
-            labels[indices_shell[endpoint_indices == endpoint_index]] = label
-
-    return labels, connectivity_matrix
+    labels_volume = np.zeros((dim_x, dim_y, dim_z), dtype=np.uint8)
+    indices_shell = np.asarray(indices_shell)
+    for label_id, label_endpoints in enumerate(label_indices):
+        for label_endpoint in label_endpoints:
+            for point_id in np.nonzero(endpoint_indices == label_endpoint)[0]:
+                i, j, k = indices_shell[:, point_id]
+                labels_volume[i, j, k] = label_id + 1
+            
+    return labels_volume, connectivity_matrix
