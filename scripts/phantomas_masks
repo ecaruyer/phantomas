@@ -83,16 +83,21 @@ if phantom_fov == None:
 
 print "\tComputing mask for each structure."
 affine = compute_affine_matrix(args.res, phantom_fov)
+phantom_center = np.array([0., 0., 0.])
 region_masks = compute_spherical_region_masks(region_centers, region_radii,
                                               args.res, phantom_fov)
-
 fiber_masks = compute_fiber_masks(fibers, args.res, phantom_fov)
+gm_mask = compute_spherical_region_masks([phantom_center],
+                                         [phantom_radius], args.res,
+                                         phantom_fov)[..., 0]
+
 
 nb_fibers = len(fibers)
 csf_mask = np.any(region_masks==2, axis=-1)
 for i in range(nb_fibers):
     fiber_mask = np.logical_and(np.logical_not(csf_mask), 
                                 fiber_masks[..., i] > 0)
+    fiber_mask = np.logical_and(fiber_mask, gm_mask > 0)
     fiber_mask = np.asarray(fiber_mask, dtype=np.uint8)
     fiber_mask_img = nib.Nifti1Image(fiber_mask, affine)
     nib.save(fiber_mask_img, os.path.join(args.out_dir, 
