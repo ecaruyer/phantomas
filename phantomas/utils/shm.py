@@ -11,7 +11,7 @@ References
 """
 import numpy as np
 from scipy.misc import factorial
-from scipy.special import lpmv, legendre
+from scipy.special import lpmv, legendre, sph_harm
 
 
 class SphericalHarmonics:
@@ -66,26 +66,18 @@ class SphericalHarmonics:
         coefs = self.coefficients
         result = 0
         order = self.order
-        j = 0 
+        j = 0
+        # We follow here reverse convention about theta and phi w.r.t scipy.
         for l in range(0, order+1, 2):
             for m in range(-l, l+1):
+                sh = sph_harm(np.abs(m), l, phi, theta)
                 if coefs[j] != 0.0:
                     if m < 0:
-                        result += coefs[j] * np.sqrt(2) \
-                        * np.sqrt((2*l + 1) * factorial(l + m) \
-                        / (4 * np.pi * factorial(l - m))) \
-                        * (-1) ** (-m)\
-                        * lpmv(-m, l, np.cos(theta)) * np.cos(m * phi)  
+                        result += coefs[j] * np.sqrt(2) * sh.real
                     if m == 0:
-                        result += coefs[j] \
-                        * np.sqrt((2*l + 1) * factorial(l - m) \
-                        / (4 * np.pi * factorial(l + m))) \
-                        * lpmv(m, l, np.cos(theta))
+                        result += coefs[j] * sh.real
                     if m > 0:
-                        result += coefs[j] * np.sqrt(2) \
-                        * np.sqrt((2*l + 1) * factorial(l - m) \
-                        / (4 * np.pi * factorial(l + m))) \
-                        * lpmv(m, l, np.cos(theta)) * np.sin(m * phi)
+                        result += coefs[j] * np.sqrt(2) * sh.imag
                 j = j+1
         return result
 
