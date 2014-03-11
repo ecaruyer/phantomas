@@ -20,7 +20,6 @@ from phantomas.utils import shm
 from phantomas.mr_simul.synthetic import GaussianModel
 import nibabel as nib
 import sys
-from sets import Set
 
 
 # Function to check if file exists
