@@ -12,6 +12,7 @@ References
 import numpy as np
 from scipy.misc import factorial
 from scipy.special import lpmv, legendre, sph_harm
+import hashlib
 
 
 class SphericalHarmonics:
@@ -142,7 +143,7 @@ def j(l, m):
     return int(l + m + (2 * np.array(range(0, l, 2)) + 1).sum())
 
 
-def l(j):
+def sh_degree(j):
     """
     Returns the degree, ``l``, of the spherical harmonic associated to index 
     ``j``.
@@ -163,7 +164,7 @@ def l(j):
     return l
 
 
-def m(j):
+def sh_order(j):
     """
     Returns the order, ``m``, of the spherical harmonic associated to index 
     ``j``.
@@ -178,11 +179,11 @@ def m(j):
     m : int
         The associated order.
     """
-    l = l(j)
+    l = sh_degree(j)
     return j + l + 1 - dimension(l)
 
 
-def matrix(theta, phi, order=4):
+class _CachedMatrix():
     """
     Returns the spherical harmonics observation matrix.
 
@@ -200,16 +201,37 @@ def matrix(theta, phi, order=4):
     H : array-like, shape (K, R)
         The spherical harmonics observation matrix.
     """
-    
-    dim_sh = dimension(order)
-    sh = SphericalHarmonics(np.zeros(dim_sh))
-    N = theta.shape[0]
-    H = np.zeros((N, dim_sh))
-    for j in range(dim_sh):
-        sh.coefficients[:] = 0
-        sh.coefficients[j] = 1.0
-        H[:, j] = sh.angular_function(theta, phi)
-    return H
+    def __init__(self):
+        self._cache = {}
+
+
+    def __call__(self, theta, phi, order=4):
+        key1 = self._hash(theta)
+        key2 = self._hash(phi)
+        if (key1, key2, order) in self._cache:
+            return self._cache[(key1, key2, order)]
+        else:
+            val = self._eval_matrix(theta, phi, order)
+            self._cache[(key1, key2, order)] =  val
+            return val
+        
+
+    def _hash(self, np_array):
+        return hashlib.sha1(np_array).hexdigest()
+
+   
+    def _eval_matrix(self, theta, phi, order):
+        dim_sh = dimension(order)
+        sh = SphericalHarmonics(np.zeros(dim_sh))
+        N = theta.shape[0]
+        H = np.zeros((N, dim_sh))
+        for j in range(dim_sh):
+            sh.coefficients[:] = 0
+            sh.coefficients[j] = 1.0
+            H[:, j] = sh.angular_function(theta, phi)
+        return H
+
+matrix = _CachedMatrix()
 
 
 def L(order=4):
@@ -223,7 +245,7 @@ def L(order=4):
     dim_sh = dimension(order)
     L = np.zeros((dim_sh, dim_sh))
     for j in range(dim_sh):
-        l =  l(j)
+        l =  sh_degree(j)
         L[j, j] = - (l * (l + 1))
     return L
 
@@ -239,6 +261,31 @@ def P(order=4):
     dim_sh = dimension(order)
     P = zeros((dim_sh, dim_sh))
     for j in range(dim_sh):
-        l =  l(j)
+        l =  sh_degree(j)
         P[j, j] = 2 * pi * legendre(l)(0)
     return P
+
+
+def convert_to_mrtrix(order):
+    """
+    Returns the linear matrix used to convert coefficients into the mrtrix 
+    convention for spherical harmonics.
+
+    Parameters
+    ----------
+    order : int
+
+    Returns
+    -------
+    conversion_matrix : array-like, shape (dim_sh, dim_sh)
+    """
+    dim_sh = dimension(order)
+    conversion_matrix = np.zeros((dim_sh, dim_sh))
+    for j in range(dim_sh):
+        l = sh_degree(j)
+        m = sh_order(j)
+        if m == 0:
+            conversion_matrix[j, j] = 1
+        else:
+            conversion_matrix[j, j - 2*m] = np.sqrt(2)
+    return conversion_matrix

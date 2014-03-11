@@ -57,6 +57,9 @@ parser.add_argument('--snr', type=float, default=100.,
                          "0.0 for noise-free images")
 parser.add_argument('--seed', type=int, default=None,
                      help="Seed for the random number generator.")
+parser.add_argument('--export_fod', default=None,
+                     help="Either 'dipy' or 'mrtrix': sets the convention of."
+                          "the exported FODs.")
 args = parser.parse_args()
 
 
@@ -172,6 +175,16 @@ for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
     fod_weights /= fod_weights.sum()
     fods[i, j, k] = compute_fod(fod_samples, fod_weights, kappa=50, sh=True,
                                 order_sh=order_sh)
+
+
+if args.export_fod is not None:
+    print "Exporting fods following %s's convention." % args.export_fod
+    if args.export_fod == "dipy":
+        fods_img = nib.Nifti1Image(fods, affine)
+    elif args.export_fod == "mrtrix":
+        conversion_matrix = shm.convert_to_mrtrix(order_sh)
+        fods_img = nib.Nifti1Image(np.dot(fods, conversion_matrix.T), affine)
+nib.save(fods_img, "fods.nii.gz")
 
 
 print "\tPrepare synthetic model of diffusion and convolution with FOD."
