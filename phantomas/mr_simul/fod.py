@@ -102,11 +102,11 @@ def compute_fod(fod_samples, fod_weights, dirs=None, kappa=30, sh=False,
     nb_samples = fod_samples.shape[0]
     nb_dirs = dirs.shape[0]
     fod = np.zeros(nb_dirs)
-    c = (np.exp(kappa) - 1) / kappa
+    c = kappa / (4 * np.pi * (np.exp(kappa) - 1))
     for i in range(nb_samples):
         dot_prods = np.dot(dirs, fod_samples[i])
         fod += np.exp(kappa * np.abs(dot_prods)) * fod_weights[i]
-    fod /= c
+    fod *= c
     if not sh:
         return fod
 
