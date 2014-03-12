@@ -86,6 +86,7 @@ for fiber_name, fiber_params in fibers_dict.items():
     fiber_trajectories.append(f(ts))
     fiber_tangents.append(f.tangents(ts))
     fiber_radii.append(radius)
+print "Found %d fibers." % len(fibers)
 
 # Read Isotropic regions
 regions_dict = geometry.get("isotropic_regions", {})
@@ -179,10 +180,11 @@ for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
 if args.export_fod is not None:
     print "Exporting fods following %s's convention." % args.export_fod
     if args.export_fod == "dipy":
-        fods_img = nib.Nifti1Image(fods, affine)
+        fods_img = nib.Nifti1Image(fods * wm_vf[..., np.newaxis], affine)
     elif args.export_fod == "mrtrix":
         conversion_matrix = shm.convert_to_mrtrix(order_sh)
-        fods_img = nib.Nifti1Image(np.dot(fods, conversion_matrix.T), affine)
+        fods_img = nib.Nifti1Image(np.dot(fods, conversion_matrix.T) \
+                                   * wm_vf[..., np.newaxis], affine)
 nib.save(fods_img, "fods.nii.gz")
 
 
