@@ -98,22 +98,23 @@ def compute_fod(fod_samples, fod_weights, dirs=None, kappa=30, sh=False,
     """
     if dirs == None:
         __location__ = os.path.dirname(__file__)
-        dirs = np.loadtxt(os.path.join(__location__, "./spherical_21_design.txt"))
+        dirs = np.loadtxt(os.path.join(__location__, 
+                          "./spherical_21_design.txt"))
     nb_samples = fod_samples.shape[0]
     nb_dirs = dirs.shape[0]
     fod = np.zeros(nb_dirs)
-    c = (np.exp(kappa) - 1) / kappa
+    c = kappa / (4 * np.pi * (np.exp(kappa) - 1))
     for i in range(nb_samples):
         dot_prods = np.dot(dirs, fod_samples[i])
         fod += np.exp(kappa * np.abs(dot_prods)) * fod_weights[i]
-    fod /= c
+    fod *= c
     if not sh:
         return fod
-
     np.clip(dirs, -1, 1, dirs)
     x, y, z = dirs.T
     theta = np.arccos(z)
     phi = np.arctan2(y, x)
     H = shm.matrix(theta, phi, order=order_sh)
-    pseudo_inv = np.linalg.pinv(H)
-    return np.dot(pseudo_inv, fod)
+    pseudo_inv = np.dot(np.linalg.inv(np.dot(H.T, H)), H.T)
+    res = np.dot(pseudo_inv, fod)
+    return res
