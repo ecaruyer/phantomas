@@ -15,92 +15,55 @@ from scipy.special import lpmv, legendre, sph_harm
 import hashlib
 
 
-class SphericalHarmonics:
-    """This class describes a symmetrical spherical function by its spherical 
-    hamonics coefficients.
+def angular_function(j, theta, phi):
+    """
+    Returns the values of the spherical harmonics function at given 
+    positions specified by colatitude and aximuthal angles.
 
     Parameters
     ----------
-    coefficients : array-like, shape (R, )
-        The coefficients vector of the spherical harmonics function. The order
-        in which the coefficients are stored is described in :func:`j`.
+    j : int
+        The spherical harmonic index.
+    theta : array-like, shape (K, )
+        The colatitude angles.
+    phi : array-like, shape (K, )
+        The azimuth angles.
+
+    Returns
+    -------
+    f : array-like, shape (K, )
+        The value of the function at given positions.
     """
-    
-    def __init__(self, coefficients):
-        self._create_from_coefficients(coefficients)
-
-    
-    def _create_from_coefficients(self, coefficients):
-        order = 2
-        while True:
-            dimension = (order + 1) * (order + 2) / 2
-            if len(coefficients) == dimension:
-                self.order = order
-                self.coefficients = coefficients
-                return
-            elif len(coefficients) < dimension:
-                raise NameError("Invalid dimension for SH coefficients.")
-            order += 2
+    l = sh_degree(j)
+    m = sh_order(j)
+    # We follow here reverse convention about theta and phi w.r.t scipy.
+    sh = sph_harm(np.abs(m), l, phi, theta)
+    if m < 0:
+        return np.sqrt(2) * sh.real
+    if m == 0:
+        return sh.real
+    if m > 0:
+        return np.sqrt(2) * sh.imag
 
 
-    def set_coefficients(self, coefficients):
-        self.coefficients[:] = coefficients[:]
+def spherical_function(j, x, y, z):
+    """
+    Returns the values of the spherical harmonics function at given 
+    positions specified by Cartesian coordinates.
 
+    Parameters
+    ----------
+    x, y, z : array-like, shape (K, )
+        Cartesian coordinates.
 
-    def angular_function(self, theta, phi):
-        """
-        Returns the values of the spherical harmonics function at given 
-        positions specified by colatitude and aximuthal angles.
-
-        Parameters
-        ----------
-        theta : array-like, shape (K, )
-            The colatitude angles.
-        phi : array0-like, shape (K, )
-            The azimuth angles.
-
-        Returns
-        -------
-        f : array-like, shape (K, )
-            The value of the function at given positions.
-        """
-        coefs = self.coefficients
-        result = 0
-        order = self.order
-        j = 0
-        # We follow here reverse convention about theta and phi w.r.t scipy.
-        for l in range(0, order+1, 2):
-            for m in range(-l, l+1):
-                sh = sph_harm(np.abs(m), l, phi, theta)
-                if coefs[j] != 0.0:
-                    if m < 0:
-                        result += coefs[j] * np.sqrt(2) * sh.real
-                    if m == 0:
-                        result += coefs[j] * sh.real
-                    if m > 0:
-                        result += coefs[j] * np.sqrt(2) * sh.imag
-                j = j+1
-        return result
-
-
-    def spherical_function(self, x, y, z):
-        """
-        Returns the values of the spherical harmonics function at given 
-        positions specified by Cartesian coordinates.
-
-        Parameters
-        ----------
-        x, y, z : array-like, shape (K, )
-            Cartesian coordinates.
-
-        Returns
-        -------
-        f : array-like, shape (K, )
-            The value of the function at given positions.
-        """
-        theta = np.arccos(z)
-        phi = np.arctan2(y, x)
-        return self.angular_function(theta, phi)
+    Returns
+    -------
+    f : array-like, shape (K, )
+        The value of the function at given positions.
+    """
+    theta = np.arccos(z)
+    phi = np.arctan2(y, x)
+    return angular_function(j, theta, phi)
 
 
 def dimension(order):
@@ -222,13 +185,10 @@ class _CachedMatrix():
    
     def _eval_matrix(self, theta, phi, order):
         dim_sh = dimension(order)
-        sh = SphericalHarmonics(np.zeros(dim_sh))
         N = theta.shape[0]
         H = np.zeros((N, dim_sh))
         for j in range(dim_sh):
-            sh.coefficients[:] = 0
-            sh.coefficients[j] = 1.0
-            H[:, j] = sh.angular_function(theta, phi)
+            H[:, j] = angular_function(j, theta, phi)
         return H
 
 matrix = _CachedMatrix()

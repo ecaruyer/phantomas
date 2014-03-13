@@ -187,7 +187,7 @@ if args.export_fod is not None:
         conversion_matrix = shm.convert_to_mrtrix(order_sh)
         fods_img = nib.Nifti1Image(np.dot(fods, conversion_matrix.T) \
                                    * wm_vf[..., np.newaxis], affine)
-nib.save(fods_img, "fods.nii.gz")
+    nib.save(fods_img, "fods.nii.gz")
 
 
 print "\tPrepare synthetic model of diffusion and convolution with FOD."
