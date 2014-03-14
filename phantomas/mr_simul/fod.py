@@ -195,9 +195,9 @@ def compute_fod_sh(fod_samples, fod_weights, kappa=30, order_sh=8):
     x, y, z = fod_samples.T
     theta = np.arccos(z)
     phi = np.arctan2(y, x)
-    H = shm.matrix(theta, phi, order=order_sh)
+    H = shm.matrix(theta, phi, order=order_sh, cache=False)
     for l in range(0, order_sh + 1, 2):
-        coeff_vmf = x_l(kappa, l)
+        coeff_vmf = x_l(kappa, l) * np.sqrt(4*np.pi / (2*l + 1))
         H[:, shm.dimension(l-2):shm.dimension(l)] *= coeff_vmf
     H *= fod_weights[:, np.newaxis]
     print H.shape

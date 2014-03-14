@@ -158,6 +158,8 @@ class _CachedMatrix():
         The azimuth angles.
     order : int
         The spherical harmonics truncation order.
+    cache : bool
+        Whether the result should be cached or not.
 
     Returns
     -------
@@ -168,7 +170,9 @@ class _CachedMatrix():
         self._cache = {}
 
 
-    def __call__(self, theta, phi, order=4):
+    def __call__(self, theta, phi, order=4, cache=True):
+        if not cache:
+            return self._eval_matrix(theta, phi, order)
         key1 = self._hash(theta)
         key2 = self._hash(phi)
         if (key1, key2, order) in self._cache:
