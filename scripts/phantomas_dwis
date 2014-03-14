@@ -15,7 +15,10 @@ from phantomas.mr_simul.image_formation \
     import (relaxation_time_images,
             mr_signal,
             rician_noise)
-from phantomas.mr_simul.fod import compute_directions, compute_fod
+from phantomas.mr_simul.fod \
+    import (compute_directions, 
+            compute_fod, 
+            compute_fod_sh)
 from phantomas.utils import shm
 from phantomas.mr_simul.synthetic import GaussianModel
 import nibabel as nib
@@ -167,6 +170,7 @@ wm_mask = np.any(fiber_masks > 0, axis=-1)
 wm_indices = np.nonzero(wm_mask)
 resolution = 9
 for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
+    print "\tComputing voxel ", i, j, k
     voxel_center = np.dot(affine, np.asarray([i, j, k, 1.0]))[:3]
     fiber_indices = np.nonzero(fiber_masks[i, j, k])[0]
     fod_samples, fod_weights = compute_directions(
@@ -175,8 +179,10 @@ for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
         [fiber_radii[n] for n in fiber_indices],
         voxel_center, args.res, resolution)
     fod_weights /= fod_weights.sum()
-    fods[i, j, k] = compute_fod(fod_samples, fod_weights, kappa=50, sh=True,
-                                order_sh=order_sh)
+#    fods[i, j, k] = compute_fod(fod_samples, fod_weights, kappa=50, sh=True,
+#                                order_sh=order_sh)
+    fods[i, j, k] = compute_fod_sh(fod_samples, fod_weights, kappa=50, 
+                                   order_sh=order_sh)
 
 
 if args.export_fod is not None:

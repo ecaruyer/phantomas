@@ -184,11 +184,16 @@ class _CachedMatrix():
 
    
     def _eval_matrix(self, theta, phi, order):
-        dim_sh = dimension(order)
         N = theta.shape[0]
-        H = np.zeros((N, dim_sh))
-        for j in range(dim_sh):
-            H[:, j] = angular_function(j, theta, phi)
+        dim_sh = dimension(order)
+        ls = [l for L in range(0, order + 1, 2) for l in [L] * (2*L + 1)]
+        ms = [m for L in range(0, order + 1, 2) for m in range(-L, L+1)]
+        ls = np.asarray(ls, dtype=np.int)[np.newaxis, :]
+        ms = np.asarray(ms, dtype=np.int)[np.newaxis, :]
+        sh = sph_harm(np.abs(ms), ls, 
+                      phi[:, np.newaxis], theta[:, np.newaxis])
+        H = np.where(ms > 0, sh.imag, sh.real)
+        H[ms != 0] *= np.sqrt(2)
         return H
 
 matrix = _CachedMatrix()
