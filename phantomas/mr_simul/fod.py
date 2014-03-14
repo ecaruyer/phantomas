@@ -3,9 +3,11 @@ This module contains functions for the computation of the ground truth fiber
 orientation distribution (FOD) from a collection of fibers.
 """
 import numpy as np
+from scipy.special import legendre
 from .fast_volume_fraction import *
 import os
 from ..utils import shm
+
 
 def compute_directions(fibers, tangents, fiber_radii, voxel_center, voxel_size, 
                        resolution):
@@ -118,3 +120,85 @@ def compute_fod(fod_samples, fod_weights, dirs=None, kappa=30, sh=False,
     pseudo_inv = np.dot(np.linalg.inv(np.dot(H.T, H)), H.T)
     res = np.dot(pseudo_inv, fod)
     return res
+
+
+def _beta(kappa, n):
+    r"""
+    Computes the integral $\int_0^1 t^n \exp(\kappa t) \mathrm{d}t$.
+
+    """
+    if kappa == 0:
+        return 1 / (n + 1)
+    if n == 0:
+        return (np.exp(kappa) - 1) / kappa
+    else:
+        beta_nm1 = _beta(kappa, n - 1)
+        return (np.exp(kappa) - n*beta_nm1) / kappa
+
+
+def c_vmf(kappa):
+    """
+    Computes the normalization constant of the Von-Mises Fischer kernel.
+    """
+    return kappa / (4 * np.pi * (np.exp(kappa) - 1))
+
+
+def x_l(kappa, l):
+    """
+    Computes the l-th degree SH coefficient of the projection of the 
+    symmetric Von-Mises Fischer kernel (centered at z-axis).
+
+    Parameters
+    ----------
+    kappa : float
+        The concentration parameter of the symmetric Von-Mises Fischer 
+        distribution.
+    l : int
+        The degree of the SH coefficient to be computed.
+    """
+    a = kappa / (np.exp(kappa) - 1)
+    a *= np.sqrt((2*l + 1) / (4 * np.pi))
+    legendre_coeffs = legendre(l).coeffs[::-1]
+    x = 0
+    for n in range(0, l + 1, 2):
+        x += legendre_coeffs[n] * _beta(kappa, n)
+    return a*x
+
+
+def compute_fod_sh(fod_samples, fod_weights, kappa=30, order_sh=8):
+    """
+    Computes fod using pure spherical harmonics from a discrete set of 
+    weighted directions, using kernel density estimation with a symmetric Von 
+    Mises-Fisher kernel.
+
+    Parameters
+    ----------
+    fod_samples : array-like shape (P, 3)
+        A discrete set of directions, as obtained by 
+        :func:`compute_directions`.
+    fod_weights : array-like shape (P, )
+        The volume fractions associated to the directions, as obtained by 
+        :func:`compute_directions`.
+    kappa : double
+        The concentration factor of the Von Mises-Fischer distribution.
+    order_sh : int
+        Truncation order of the spherical harmonic representation.
+
+    Returns
+    -------
+    fod : array-like, shape (dim_sh, )
+        The spherical harmonic coefficients of the FOD.
+    """
+    nb_samples = fod_samples.shape[0]
+    if nb_samples == 0:
+        return 0
+    x, y, z = fod_samples.T
+    theta = np.arccos(z)
+    phi = np.arctan2(y, x)
+    H = shm.matrix(theta, phi, order=order_sh, cache=False)
+    for l in range(0, order_sh + 1, 2):
+        coeff_vmf = x_l(kappa, l) * np.sqrt(4*np.pi / (2*l + 1))
+        H[:, shm.dimension(l-2):shm.dimension(l)] *= coeff_vmf
+    H *= fod_weights[:, np.newaxis]
+    print H.shape
+    return H.sum(0)
