@@ -66,7 +66,8 @@ def compute_fiber_masks(fibers, voxel_size, image_size):
     Parameters
     ----------
     fibers : sequence, length (F, )
-        A sequence of Fiber instance (see :class:`phantomas.geometry.models.Fiber`).
+        A sequence of Fiber instance (see 
+        :class:`phantomas.geometry.models.Fiber`).
     voxel_size : int
         the voxel size in mm (voxels are isotropic).
     image_size : int
@@ -169,7 +170,13 @@ def spherical_regions_volume_fraction(centers, radii, voxel_center,
     voxel_size : the voxel size in millimeter
     resolution : int
         the number of subdivision in each dimension.
+
+    Returns
+    -------
+    volume_fractions : array-like, shape (nb_regions, )
+
     """
+    nb_regions = len(centers)
     subvoxel_size = 1.0 * voxel_size / resolution
     dim_grid = resolution * resolution * resolution
     indices = np.mgrid[0:resolution, 0:resolution, 0:resolution]
@@ -179,13 +186,12 @@ def spherical_regions_volume_fraction(centers, radii, voxel_center,
                      + voxel_center
 
     nb_regions = len(radii)
-    volume_fraction = np.zeros(dim_grid, dtype=np.uint8)
+    volume_fraction = np.zeros((nb_regions, dim_grid), dtype=np.uint8)
     for i, (center, radius) in enumerate(zip(centers, radii)):
         center_to_center = center_positions - center
         dst_to_center = (center_to_center ** 2).sum(1)
-        volume_fraction = np.logical_or(volume_fraction, 
-                                        dst_to_center < radius ** 2)
-    return volume_fraction.sum() / dim_grid
+        volume_fraction[i] = dst_to_center < radius ** 2
+    return volume_fraction.sum(0) / dim_grid
  
 
 def fibers_volume_fraction(fibers, intersect_codes, 
@@ -247,7 +253,8 @@ def compute_volume_fractions(phantom_center, phantom_radius, gm_mask,
                              voxel_size, image_size):
     """
     Computes the volume fraction of background and of each tissue type, for a
-    given resolution.
+    given resolution. NB: The volume fraction of partial-volume water regions
+    are additive.
 
     Parameters
     ----------
@@ -281,7 +288,7 @@ def compute_volume_fractions(phantom_center, phantom_radius, gm_mask,
         gm_volume_fraction[i, j, k] = \
               spherical_regions_volume_fraction([np.asarray([0., 0., 0.])], 
                                                 [phantom_radius], 
-                                                voxel_center, voxel_size)
+                                                voxel_center, voxel_size)[0]
     
     # Background volume fraction
     background_volume_fraction = 1.0 - gm_volume_fraction
@@ -306,16 +313,26 @@ def compute_volume_fractions(phantom_center, phantom_radius, gm_mask,
     # CSF volume fraction
     csf_volume_fraction = np.zeros(wm_volume_fraction.shape)
     for region_id, region in enumerate(regions):
+        region_vf = region.get_volume_fraction()
         np.maximum(csf_volume_fraction,
-                   np.where(region_masks[..., region_id]))
-    csf_volume_fraction[np.any(region_masks == 2, axis=-1)] = 1.0
-    csf_partial_volume = (region_masks == 1)
+                   np.where(region_masks[..., region_id] == 2, region_vf, 0),
+                   out=csf_volume_fraction)
+    csf_partial_volume = np.any(region_masks == 1, axis=-1)
     csf_indices = np.nonzero(csf_partial_volume)
+    region_vfs = np.array([region.get_volume_fraction() for region in regions])
+    region_centers = [region.get_center() for region in regions]
+    region_radii = [region.get_radius() for region in regions]
+    region_vfs = np.array([region.get_volume_fraction() for region in regions])
     for i, j, k in zip(csf_indices[0], csf_indices[1], csf_indices[2]):
         voxel_center = np.dot(affine, np.asarray([i, j, k, 1.0]))[:3]
         csf_volume_fraction[i, j, k] = \
-              spherical_regions_volume_fraction(region_centers, region_radii, 
-                                                voxel_center, voxel_size)
+            np.sum(region_vfs * \
+                   spherical_regions_volume_fraction(region_centers,
+                                                     region_radii,
+                                                     voxel_center, 
+                                                     voxel_size),
+                   axis = 0)
+    np.clip(csf_volume_fraction, 0., 1., out=csf_volume_fraction)
 
     # Make sure everything sums to one
     np.clip(wm_volume_fraction, 0., 1.0 - csf_volume_fraction, 

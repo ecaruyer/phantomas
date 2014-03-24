@@ -171,3 +171,14 @@ class IsotropicRegion():
 
         """
         return self.center
+
+    def get_volume_fraction(self):
+        """
+        Returns
+        -------
+        volume_fraction : double
+            The water volume fraction.
+
+        """
+        return self.volume_fraction
+
