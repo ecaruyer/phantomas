@@ -182,10 +182,7 @@ def rician_noise(image, sigma, rng=None):
     image : array-like, shape ``(dim_x, dim_y, dim_z)`` or ``(dim_x, dim_y,
         dim_z, K)``
     sigma : double
-    seed1 : the seed to use for the random number generator of the
-        first gaussian, default : None
-    seed2 : the seed to use for the random number generator of the
-        second gaussian, default : None
+    rng : random number generator (a numpy.random.RandomState instance).
     """
 
     n1 = rng.normal(loc=0, scale=sigma, size=image.shape)
