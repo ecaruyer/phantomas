@@ -156,9 +156,10 @@ class IsotropicRegion():
         The center of the spherical region.
     """
 
-    def __init__(self, radius, center):
+    def __init__(self, radius, center, volume_fraction):
         self.radius = radius
         self.center = center
+        self.volume_fraction = volume_fraction
 
 
     def get_radius(self):

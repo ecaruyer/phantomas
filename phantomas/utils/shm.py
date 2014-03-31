@@ -11,103 +11,59 @@ References
 """
 import numpy as np
 from scipy.misc import factorial
-from scipy.special import lpmv, legendre
+from scipy.special import lpmv, legendre, sph_harm
+import hashlib
 
 
-class SphericalHarmonics:
-    """This class describes a symmetrical spherical function by its spherical 
-    hamonics coefficients.
+def angular_function(j, theta, phi):
+    """
+    Returns the values of the spherical harmonics function at given 
+    positions specified by colatitude and aximuthal angles.
 
     Parameters
     ----------
-    coefficients : array-like, shape (R, )
-        The coefficients vector of the spherical harmonics function. The order
-        in which the coefficients are stored is described in :func:`j`.
+    j : int
+        The spherical harmonic index.
+    theta : array-like, shape (K, )
+        The colatitude angles.
+    phi : array-like, shape (K, )
+        The azimuth angles.
+
+    Returns
+    -------
+    f : array-like, shape (K, )
+        The value of the function at given positions.
     """
-    
-    def __init__(self, coefficients):
-        self._create_from_coefficients(coefficients)
-
-    
-    def _create_from_coefficients(self, coefficients):
-        order = 2
-        while True:
-            dimension = (order + 1) * (order + 2) / 2
-            if len(coefficients) == dimension:
-                self.order = order
-                self.coefficients = coefficients
-                return
-            elif len(coefficients) < dimension:
-                raise NameError("Invalid dimension for SH coefficients.")
-            order += 2
+    l = sh_degree(j)
+    m = sh_order(j)
+    # We follow here reverse convention about theta and phi w.r.t scipy.
+    sh = sph_harm(np.abs(m), l, phi, theta)
+    if m < 0:
+        return np.sqrt(2) * sh.real
+    if m == 0:
+        return sh.real
+    if m > 0:
+        return np.sqrt(2) * sh.imag
 
 
-    def set_coefficients(self, coefficients):
-        self.coefficients[:] = coefficients[:]
+def spherical_function(j, x, y, z):
+    """
+    Returns the values of the spherical harmonics function at given 
+    positions specified by Cartesian coordinates.
 
+    Parameters
+    ----------
+    x, y, z : array-like, shape (K, )
+        Cartesian coordinates.
 
-    def angular_function(self, theta, phi):
-        """
-        Returns the values of the spherical harmonics function at given 
-        positions specified by colatitude and aximuthal angles.
-
-        Parameters
-        ----------
-        theta : array-like, shape (K, )
-            The colatitude angles.
-        phi : array0-like, shape (K, )
-            The azimuth angles.
-
-        Returns
-        -------
-        f : array-like, shape (K, )
-            The value of the function at given positions.
-        """
-        coefs = self.coefficients
-        result = 0
-        order = self.order
-        j = 0 
-        for l in range(0, order+1, 2):
-            for m in range(-l, l+1):
-                if coefs[j] != 0.0:
-                    if m < 0:
-                        result += coefs[j] * np.sqrt(2) \
-                        * np.sqrt((2*l + 1) * factorial(l + m) \
-                        / (4 * np.pi * factorial(l - m))) \
-                        * (-1) ** (-m)\
-                        * lpmv(-m, l, np.cos(theta)) * np.cos(m * phi)  
-                    if m == 0:
-                        result += coefs[j] \
-                        * np.sqrt((2*l + 1) * factorial(l - m) \
-                        / (4 * np.pi * factorial(l + m))) \
-                        * lpmv(m, l, np.cos(theta))
-                    if m > 0:
-                        result += coefs[j] * np.sqrt(2) \
-                        * np.sqrt((2*l + 1) * factorial(l - m) \
-                        / (4 * np.pi * factorial(l + m))) \
-                        * lpmv(m, l, np.cos(theta)) * np.sin(m * phi)
-                j = j+1
-        return result
-
-
-    def spherical_function(self, x, y, z):
-        """
-        Returns the values of the spherical harmonics function at given 
-        positions specified by Cartesian coordinates.
-
-        Parameters
-        ----------
-        x, y, z : array-like, shape (K, )
-            Cartesian coordinates.
-
-        Returns
-        -------
-        f : array-like, shape (K, )
-            The value of the function at given positions.
-        """
-        theta = np.arccos(z)
-        phi = np.arctan2(y, x)
-        return self.angular_function(theta, phi)
+    Returns
+    -------
+    f : array-like, shape (K, )
+        The value of the function at given positions.
+    """
+    theta = np.arccos(z)
+    phi = np.arctan2(y, x)
+    return angular_function(j, theta, phi)
 
 
 def dimension(order):
@@ -150,7 +106,7 @@ def j(l, m):
     return int(l + m + (2 * np.array(range(0, l, 2)) + 1).sum())
 
 
-def l(j):
+def sh_degree(j):
     """
     Returns the degree, ``l``, of the spherical harmonic associated to index 
     ``j``.
@@ -171,7 +127,7 @@ def l(j):
     return l
 
 
-def m(j):
+def sh_order(j):
     """
     Returns the order, ``m``, of the spherical harmonic associated to index 
     ``j``.
@@ -186,11 +142,11 @@ def m(j):
     m : int
         The associated order.
     """
-    l = l(j)
+    l = sh_degree(j)
     return j + l + 1 - dimension(l)
 
 
-def matrix(theta, phi, order=4):
+class _CachedMatrix():
     """
     Returns the spherical harmonics observation matrix.
 
@@ -202,22 +158,49 @@ def matrix(theta, phi, order=4):
         The azimuth angles.
     order : int
         The spherical harmonics truncation order.
+    cache : bool
+        Whether the result should be cached or not.
 
     Returns
     -------
     H : array-like, shape (K, R)
         The spherical harmonics observation matrix.
     """
-    
-    dim_sh = dimension(order)
-    sh = SphericalHarmonics(np.zeros(dim_sh))
-    N = theta.shape[0]
-    H = np.zeros((N, dim_sh))
-    for j in range(dim_sh):
-        sh.coefficients[:] = 0
-        sh.coefficients[j] = 1.0
-        H[:, j] = sh.angular_function(theta, phi)
-    return H
+    def __init__(self):
+        self._cache = {}
+
+
+    def __call__(self, theta, phi, order=4, cache=True):
+        if not cache:
+            return self._eval_matrix(theta, phi, order)
+        key1 = self._hash(theta)
+        key2 = self._hash(phi)
+        if (key1, key2, order) in self._cache:
+            return self._cache[(key1, key2, order)]
+        else:
+            val = self._eval_matrix(theta, phi, order)
+            self._cache[(key1, key2, order)] =  val
+            return val
+        
+
+    def _hash(self, np_array):
+        return hashlib.sha1(np_array).hexdigest()
+
+   
+    def _eval_matrix(self, theta, phi, order):
+        N = theta.shape[0]
+        dim_sh = dimension(order)
+        ls = [l for L in range(0, order + 1, 2) for l in [L] * (2*L + 1)]
+        ms = [m for L in range(0, order + 1, 2) for m in range(-L, L+1)]
+        ls = np.asarray(ls, dtype=np.int)[np.newaxis, :]
+        ms = np.asarray(ms, dtype=np.int)[np.newaxis, :]
+        sh = sph_harm(np.abs(ms), ls, 
+                      phi[:, np.newaxis], theta[:, np.newaxis])
+        H = np.where(ms > 0, sh.imag, sh.real)
+        H[ms != 0] *= np.sqrt(2)
+        return H
+
+matrix = _CachedMatrix()
 
 
 def L(order=4):
@@ -231,7 +214,7 @@ def L(order=4):
     dim_sh = dimension(order)
     L = np.zeros((dim_sh, dim_sh))
     for j in range(dim_sh):
-        l =  l(j)
+        l =  sh_degree(j)
         L[j, j] = - (l * (l + 1))
     return L
 
@@ -247,6 +230,31 @@ def P(order=4):
     dim_sh = dimension(order)
     P = zeros((dim_sh, dim_sh))
     for j in range(dim_sh):
-        l =  l(j)
+        l =  sh_degree(j)
         P[j, j] = 2 * pi * legendre(l)(0)
     return P
+
+
+def convert_to_mrtrix(order):
+    """
+    Returns the linear matrix used to convert coefficients into the mrtrix 
+    convention for spherical harmonics.
+
+    Parameters
+    ----------
+    order : int
+
+    Returns
+    -------
+    conversion_matrix : array-like, shape (dim_sh, dim_sh)
+    """
+    dim_sh = dimension(order)
+    conversion_matrix = np.zeros((dim_sh, dim_sh))
+    for j in range(dim_sh):
+        l = sh_degree(j)
+        m = sh_order(j)
+        if m == 0:
+            conversion_matrix[j, j] = 1
+        else:
+            conversion_matrix[j, j - 2*m] = np.sqrt(2)
+    return conversion_matrix

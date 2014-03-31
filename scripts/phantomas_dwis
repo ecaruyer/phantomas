@@ -15,12 +15,14 @@ from phantomas.mr_simul.image_formation \
     import (relaxation_time_images,
             mr_signal,
             rician_noise)
-from phantomas.mr_simul.fod import compute_directions, compute_fod
+from phantomas.mr_simul.fod \
+    import (compute_directions,
+            compute_fod,
+            compute_fod_sh)
 from phantomas.utils import shm
 from phantomas.mr_simul.synthetic import GaussianModel
 import nibabel as nib
 import sys
-from sets import Set
 
 
 # Function to check if file exists
@@ -55,12 +57,14 @@ parser.add_argument('--fov', type=float, default=None,
 parser.add_argument('--snr', type=float, default=100.,
                     help="Signal-to-noise ratio of the simulated images. "
                          "0.0 for noise-free images")
-parser.add_argument('--seed', type=float, default=None,
-                    help="Seed for the random number generator of the tissue relaxation time.")
-parser.add_argument('--seedr1', type=float, default=None,
-                    help="Seed for the random number generator of the first gaussian for the rician noise generator.")
-parser.add_argument('--seedr2', type=float, default=None,
-                    help="Seed for the random number generator of the first gaussian for the rician noise generator.")
+
+parser.add_argument('--seed', type=int, default=None,
+                     help="Seed for the random number generator.")
+parser.add_argument('--order_sh', type=int, default=8,
+                     help="Spherical Harmonics truncation order for the FOD.")
+parser.add_argument('--export_fod', default=None,
+                     help="Either 'dipy' or 'mrtrix': sets the convention of."
+                          "the exported FODs.")
 args = parser.parse_args()
 
 
@@ -88,6 +92,7 @@ for fiber_name, fiber_params in fibers_dict.items():
     fiber_trajectories.append(f(ts))
     fiber_tangents.append(f.tangents(ts))
     fiber_radii.append(radius)
+print "Found %d fibers." % len(fibers)
 
 # Read Isotropic regions
 regions_dict = geometry.get("isotropic_regions", {})
@@ -148,21 +153,25 @@ background_vf, gm_vf, wm_vf, csf_vf = \
 
 
 print "\tPreparing relaxation time fields for each tissue."
+# First initialize the random number generator - if seed provided
+rng = np.random.RandomState(args.seed)
 image_shape = gm_mask.shape
 dim_x, dim_y, dim_z = image_shape
-wm_t1, wm_t2 = relaxation_time_images(image_shape, 'wm', args.seed)
-gm_t1, gm_t2 = relaxation_time_images(image_shape, 'gm', args.seed)
-csf_t1, csf_t2 = relaxation_time_images(image_shape, 'csf', args.seed)
+
+wm_t1, wm_t2 = relaxation_time_images(image_shape, 'wm', rng=rng)
+gm_t1, gm_t2 = relaxation_time_images(image_shape, 'gm', rng=rng)
+csf_t1, csf_t2 = relaxation_time_images(image_shape, 'csf', rng=rng)
 
 
 print "\tComputing fiber orientation distribution."
-order_sh = 8
+order_sh = args.order_sh
 dim_sh = shm.dimension(order_sh)
 fods = np.zeros((dim_x, dim_y, dim_z, dim_sh))
 wm_mask = np.any(fiber_masks > 0, axis=-1)
 wm_indices = np.nonzero(wm_mask)
 resolution = 9
 for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
+    print "\tComputing voxel ", i, j, k
     voxel_center = np.dot(affine, np.asarray([i, j, k, 1.0]))[:3]
     fiber_indices = np.nonzero(fiber_masks[i, j, k])[0]
     fod_samples, fod_weights = compute_directions(
@@ -171,8 +180,21 @@ for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
         [fiber_radii[n] for n in fiber_indices],
         voxel_center, args.res, resolution)
     fod_weights /= fod_weights.sum()
-    fods[i, j, k] = compute_fod(fod_samples, fod_weights, kappa=50, sh=True,
-                                order_sh=order_sh)
+#    fods[i, j, k] = compute_fod(fod_samples, fod_weights, kappa=50, sh=True,
+#                                order_sh=order_sh)
+    fods[i, j, k] = compute_fod_sh(fod_samples, fod_weights, kappa=50,
+                                   order_sh=order_sh)
+
+
+if args.export_fod is not None:
+    print "Exporting fods following %s's convention." % args.export_fod
+    if args.export_fod == "dipy":
+        fods_img = nib.Nifti1Image(fods * wm_vf[..., np.newaxis], affine)
+    elif args.export_fod == "mrtrix":
+        conversion_matrix = shm.convert_to_mrtrix(order_sh)
+        fods_img = nib.Nifti1Image(np.dot(fods, conversion_matrix.T) \
+                                   * wm_vf[..., np.newaxis], affine)
+    nib.save(fods_img, "fods.nii.gz")
 
 
 print "\tPrepare synthetic model of diffusion and convolution with FOD."
@@ -197,6 +219,9 @@ print "\tCompute diffusion signal attenuation."
 wm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions))
 wm_attenuation[..., indices_dwis] = np.dot(fods, H.T)
 
+wm_attenuation_img = nib.Nifti1Image(wm_attenuation, affine)
+nib.save(wm_attenuation_img, "wm_attenuation.nii.gz")
+
 gm_diffusivity = 0.2e-3
 gm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
     * np.exp(-bvals * gm_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
@@ -205,9 +230,6 @@ csf_diffusivity = 3.0e-3
 csf_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
     * np.exp(-bvals * csf_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
 
-#print(np.max(wm_attenuation,axis=-1), np.max(gm_attenuation,axis=-1), np.max(csf_attenuation,axis=-1))
-#print(np.max(np.dot(fods, H.T),axis=-1), np.max(np.exp(-bvals * gm_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :],axis=-1), np.max(np.exp(-bvals * csf_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :],axis=-1))
-#print wm_attenuation
 
 print "\tCompute diffusion-weighted images"
 te, tr = 0.09, 5.0
@@ -230,7 +252,8 @@ dwis = b0_wm[..., np.newaxis] * wm_attenuation \
 print "\tCorrupt images by Rician noise"
 if args.snr > 0.:
     sigma = 1 / args.snr
-    dwis = rician_noise(dwis, sigma, args.seedr1, args.seedr2)
+    dwis = rician_noise(dwis, sigma, rng=rng)
+
 
 print "\tChange image type to INT16"
 scale = 2 ** 14

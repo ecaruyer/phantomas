@@ -72,7 +72,8 @@ for region_name, region_params in regions_dict.items():
     region_centers.append(center)
     radius = region_params["radius"]
     region_radii.append(radius)
-    isotropic_region = IsotropicRegion(radius, center)
+    volume_fraction = region_params.get("volume_fraction", 1.0)
+    isotropic_region = IsotropicRegion(radius, center, volume_fraction)
     view = ViewIsotropicRegion(isotropic_region, ren, color=color.next(), 
                                label=region_name)
 
