@@ -190,5 +190,4 @@ def rician_noise(image, sigma, rng=None):
 
     n1 = rng.normal(loc=0, scale=sigma, size=image.shape)
     n2 = rng.normal(loc=0, scale=sigma, size=image.shape)
-
     return np.sqrt((image + n1)**2 + n2**2)

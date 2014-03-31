@@ -65,6 +65,8 @@ parser.add_argument('--order_sh', type=int, default=8,
 parser.add_argument('--export_fod', default=None,
                      help="Either 'dipy' or 'mrtrix': sets the convention of."
                           "the exported FODs.")
+parser.add_argument('--export_vf',  action='store_true', required=False,
+                   default=False, help='If supplied, saves the volume fraction for each tissue type.')
 args = parser.parse_args()
 
 
@@ -151,13 +153,24 @@ background_vf, gm_vf, wm_vf, csf_vf = \
                              region_centers, region_radii, region_masks,
                              args.res, phantom_fov)
 
+if args.export_vf:
+    print "Exporting volume fraction."
+
+    gm_vf_img = nib.Nifti1Image(gm_vf, affine)
+    nib.save(gm_vf_img, "gm_vf.nii.gz")
+
+    wm_vf_img = nib.Nifti1Image(wm_vf, affine)
+    nib.save(wm_vf_img, "wm_vf.nii.gz")
+
+    csf_vf_img = nib.Nifti1Image(csf_vf, affine)
+    nib.save(csf_vf_img, "csf_vf.nii.gz")
+
 
 print "\tPreparing relaxation time fields for each tissue."
 # First initialize the random number generator - if seed provided
 rng = np.random.RandomState(args.seed)
 image_shape = gm_mask.shape
 dim_x, dim_y, dim_z = image_shape
-
 wm_t1, wm_t2 = relaxation_time_images(image_shape, 'wm', rng=rng)
 gm_t1, gm_t2 = relaxation_time_images(image_shape, 'gm', rng=rng)
 csf_t1, csf_t2 = relaxation_time_images(image_shape, 'csf', rng=rng)
@@ -253,7 +266,6 @@ print "\tCorrupt images by Rician noise"
 if args.snr > 0.:
     sigma = 1 / args.snr
     dwis = rician_noise(dwis, sigma, rng=rng)
-
 
 print "\tChange image type to INT16"
 scale = 2 ** 14
