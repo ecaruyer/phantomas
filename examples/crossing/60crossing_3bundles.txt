@@ -3,7 +3,7 @@
     "fiber165": {
       "control_points":
         [-48.3, 13.0, 0.0,          
-           0.0, 0.0, 0.0,
+           0.0,  0.0, 0.0,
           48.3,-13.0, 0.0],
       "tangents": "symmetric",
       "radius": 4.0
@@ -11,7 +11,7 @@
     "fiber105": {
       "control_points":
         [-13.0, 48.3, 0.0,          
-           0.0, 0.0, 0.0,
+           0.0,  0.0, 0.0,
           13.0,-48.3, 0.0],
       "tangents": "symmetric",
       "radius": 4.0
@@ -19,7 +19,7 @@
     "fiber045": {
       "control_points":
         [ 35.4, 35.4, 0.0,          
-           0.0,  0.0 , 0.0,
+           0.0,  0.0, 0.0,
          -35.4,-35.4, 0.0],
       "tangents": "symmetric",
       "radius": 4.0

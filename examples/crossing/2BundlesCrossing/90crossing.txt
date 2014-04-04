@@ -3,7 +3,7 @@
     "fiber090": {
       "control_points":
         [  0.0, 50.0, 0.0,          
-           0.0, 0.0, 0.0,
+           0.0, 0.0,  0.0,
            0.0,-50.0, 0.0],
       "tangents": "symmetric",
       "radius": 4.0
@@ -11,7 +11,7 @@
     "fiber000": {
       "control_points":
         [ 50.0,  0.0, 0.0,          
-           0.0,  0.0 , 0.0,
+           0.0,  0.0, 0.0,
          -50.0,  0.0, 0.0],
       "tangents": "symmetric",
       "radius": 4.0

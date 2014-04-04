@@ -16,7 +16,7 @@
       "tangents": "symmetric",
       "radius": 4.0
     }, 
-     "-X+Z": {
+     "Z": {
       "control_points":
         [  0.0, 0.0, 50.0,          
            0.0, 0.0,  0.0,
