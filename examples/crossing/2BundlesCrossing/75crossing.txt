@@ -2,16 +2,14 @@
   "fiber_geometries" : {
     "fiber090": {
       "control_points":
-        [  0.0, 50.0, 0.0,          
-           0.0,  0.0, 0.0,
+        [  0.0, 50.0, 0.0,
            0.0,-50.0, 0.0],
       "tangents": "symmetric",
       "radius": 4.0
     },
     "fiber015": {
       "control_points":
-        [ 48.3, 13.0, 0.0,          
-           0.0,  0.0, 0.0,
+        [ 48.3, 13.0, 0.0,
          -48.3,-13.0, 0.0],
       "tangents": "symmetric",
       "radius": 4.0
