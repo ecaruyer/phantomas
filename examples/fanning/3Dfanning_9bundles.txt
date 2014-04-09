@@ -3,82 +3,72 @@
     "X120": {
       "control_points":
         [-25.0, 43.3, 0.0,          
-           0.0,  0.0, 0.0,
-           0.0, -1.0, 0.0,
+           0.0, 10.0, 0.0,
            0.0,-50.0, 0.0],
-      "tangents": "symmetric",
+      "tangents": "outgoing",
       "radius": 4.0
     },
     "090": {
       "control_points":
-        [  0.0, 50.0, 0.0,          
-           0.0,  0.0, 0.0,
-           0.0, -1.0, 0.0,
+        [  0.0, 50.0, 0.0,
            0.0,-50.0, 0.0],
-      "tangents": "symmetric",
+      "tangents": "outgoing",
       "radius": 4.0
     },
     "X060": {
       "control_points":
         [ 25.0, 43.3, 0.0,          
-           0.0,  0.0, 0.0,
-           0.0, -1.0, 0.0,
+           0.0, 10.0, 0.0,
            0.0,-50.0, 0.0],
-      "tangents": "symmetric",
+      "tangents": "outgoing",
       "radius": 4.0
     },
     "Z120": {
       "control_points":
         [  0.0, 43.3,-25.0,          
            0.0,  0.0,  0.0,
-           0.0, -1.0,  0.0,
            0.0,-50.0,  0.0],
-      "tangents": "symmetric",
+      "tangents": "outgoing",
       "radius": 4.0
     },
     "Z060": {
       "control_points":
         [  0.0, 43.3, 25.0,          
            0.0,  0.0,  0.0,
-           0.0, -1.0,  0.0,
            0.0,-50.0,  0.0],
-      "tangents": "symmetric",
+      "tangents": "outgoing",
       "radius": 4.0
     },
     "Y045+Z+X": {
       "control_points":
         [ 28.9, 28.9, 28.9,          
-           0.0,  0.0,  0.0,
-           0.0, -1.0,  0.0,
+           0.0,-20.0,  0.0,
            0.0,-50.0,  0.0],
-      "tangents": "symmetric",
+      "tangents": "outgoing",
       "radius": 4.0
     },
     "Y045+Z-X": {
       "control_points":
         [-28.9, 28.9, 28.9,          
-           0.0,  0.0,  0.0,
-           0.0, -1.0,  0.0,
+           0.0,-10.0,  0.0,
            0.0,-50.0,  0.0],
-      "tangents": "symmetric",
+      "tangents": "outgoing",
       "radius": 4.0
     },
     "Y045-Z+X": {
       "control_points":
         [ 28.9, 28.9,-28.9,          
-           0.0,  0.0,  0.0,
-           0.0, -1.0,  0.0,
+           0.0,-10.0,  0.0,
            0.0,-50.0,  0.0],
-      "tangents": "symmetric",
+      "tangents": "outgoing",
       "radius": 4.0
     },
     "Y045-Z-X": {
       "control_points":
         [-28.9, 28.9,-28.9,          
-           0.0,  0.0,  0.0,
-           0.0, -1.0,  0.0,
+           0.0,-20.0,  0.0,
            0.0,-50.0,  0.0],
-      "tangents": "symmetric",
+      "tangents": "outgoing",
       "radius": 4.0
     }
   }
