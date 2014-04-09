@@ -1,0 +1,20 @@
+{
+  "fiber_geometries" : {
+    "fiber120K": {
+      "control_points":
+        [ 25.0,-43.3, 0.0,          
+           2.0,  0.0, 0.0,
+          25.0, 43.3, 0.0],
+      "tangents": "symmetric",
+      "radius": 4.0
+    },
+     "fiber60K": {
+      "control_points":
+        [-25.0,-43.3, 0.0,          
+          -2.0,  0.0, 0.0,
+         -25.0, 43.3, 0.0],
+      "tangents": "symmetric",
+      "radius": 4.0
+    }
+  }
+}

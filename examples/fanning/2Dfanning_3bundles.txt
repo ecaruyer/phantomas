@@ -1,0 +1,28 @@
+{
+  "fiber_geometries" : {
+    "120": {
+      "control_points":
+        [-25.0, 43.3, 0.0,        
+           0.0,  0.0, 0.0,
+           0.0,-50.0, 0.0],
+      "tangents": "outgoing",
+      "radius": 4.0
+    },
+    "090": {
+      "control_points":
+        [  0.0, 50.0, 0.0,          
+           0.0,  0.0, 0.0,
+           0.0,-50.0, 0.0],
+      "tangents": "outgoing",
+      "radius": 4.0
+    },
+    "060": {
+      "control_points":
+        [ 25.0, 43.3, 0.0,          
+           0.0,  0.0, 0.0,
+           0.0,-50.0, 0.0],
+      "tangents": "outgoing",
+      "radius": 4.0
+    }
+  }
+}
