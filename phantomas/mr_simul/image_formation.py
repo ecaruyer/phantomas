@@ -1,13 +1,13 @@
 """
 This module contains functions for MR image formation, such as random
-generation of T1/T2 relaxation time images, etc. In this regard, the mean and 
-standard deviation of relaxation times of biological tissues, are taken from 
+generation of T1/T2 relaxation time images, etc. In this regard, the mean and
+standard deviation of relaxation times of biological tissues, are taken from
 [1]_.
 
 References
 ----------
-.. [1] Wansapura, Janaka P., Scott K. Holland, R. Scott Dunn, and William S. 
-   Ball. "NMR relaxation times in the human brain at 3.0 tesla." Journal of 
+.. [1] Wansapura, Janaka P., Scott K. Holland, R. Scott Dunn, and William S.
+   Ball. "NMR relaxation times in the human brain at 3.0 tesla." Journal of
    magnetic resonance imaging 9, no.  4 (1999): 531-538.
 """
 import numpy as np
@@ -30,7 +30,7 @@ def _random_correlated_image(mean, sigma, image_shape, alpha=0.3, rng=None):
     """
     dim_x, dim_y, dim_z = image_shape
     dim_image = dim_x * dim_y * dim_z
-    
+
     correlated_image = 0
     for neighbor in [(1, 0, 0), (0, 1, 0), (0, 0, 1)]:
         corr_data = []
@@ -41,28 +41,27 @@ def _random_correlated_image(mean, sigma, image_shape, alpha=0.3, rng=None):
             ind = np.asarray(np.mgrid[0:dim_x-i, 0:dim_y-j, 0:dim_z-k], dtype=np.int)
             ind = ind.reshape((3, (dim_x - i) * (dim_y - j) * (dim_z - k)))
             corr_i.extend(np.ravel_multi_index(ind, (dim_x, dim_y, dim_z)).tolist())
-            corr_j.extend(np.ravel_multi_index(ind + np.asarray([i, j, k])[:, None], 
+            corr_j.extend(np.ravel_multi_index(ind + np.asarray([i, j, k])[:, None],
                                           (dim_x, dim_y, dim_z)).tolist())
             if i>0 or j>0 or k>0:
-                corr_i.extend(np.ravel_multi_index(ind + np.asarray([i, j, k])[:, None], 
+                corr_i.extend(np.ravel_multi_index(ind + np.asarray([i, j, k])[:, None],
                                               (dim_x, dim_y, dim_z)).tolist())
                 corr_j.extend(np.ravel_multi_index(ind, (dim_x, dim_y, dim_z)).tolist())
             if i==0 and j==0 and k==0:
                 corr_data.extend([3.0] * ind.shape[1])
             else:
                 corr_data.extend([alpha * 3.0] * 2 * ind.shape[1])
-    
+
         correlation = scisp.csc_matrix((corr_data, (corr_i, corr_j)), shape=(dim_image, dim_image))
-        
+
         factor = cholesky(correlation)
         L = factor.L()
         P = factor.P()[None, :]
-        P = scisp.csc_matrix((np.ones(dim_image), 
-                              np.vstack((P, np.asarray(range(dim_image))[None, :]))), 
+        P = scisp.csc_matrix((np.ones(dim_image),
+                              np.vstack((P, np.asarray(range(dim_image))[None, :]))),
                              shape=(dim_image, dim_image))
-        
+
         sq_correlation = P.dot(L)
-        
         X = rng.normal(0, 1, dim_image)
         Y = sq_correlation.dot(X)
         Y = Y.reshape((dim_x, dim_y, dim_z))
@@ -93,7 +92,7 @@ _physical_parameters = {
 
 def relaxation_time_images(image_shape, tissue_type, rng=None):
     """
-    Return randomly generated images of t1 and t2 relaxation times, of 
+    Return randomly generated images of t1 and t2 relaxation times, of
     desired shape, for the desired tissue type.
 
     Parameters
@@ -101,7 +100,7 @@ def relaxation_time_images(image_shape, tissue_type, rng=None):
     image_shape : tuple
         ``dim_x, dim_y, dim_z``
     tissue_type : 'wm', 'gm', 'csf'
-        The tissue type, either white matter (WM), gray matter (GM), or 
+        The tissue type, either white matter (WM), gray matter (GM), or
         cerebro-spinal fluid (CSF).
 
     Returns
@@ -113,10 +112,10 @@ def relaxation_time_images(image_shape, tissue_type, rng=None):
     rng : int
         random number generator (a numpy.random.RandomState instance).
     """
-    t1 = _random_correlated_image(_physical_parameters[tissue_type]['t1']['mean'], 
+    t1 = _random_correlated_image(_physical_parameters[tissue_type]['t1']['mean'],
                                  _physical_parameters[tissue_type]['t1']['stddev'],
                                  image_shape, rng=rng)
-    t2 = _random_correlated_image(_physical_parameters[tissue_type]['t2']['mean'], 
+    t2 = _random_correlated_image(_physical_parameters[tissue_type]['t2']['mean'],
                                  _physical_parameters[tissue_type]['t2']['stddev'],
                                  image_shape, rng=rng)
     return t1, t2
@@ -154,7 +153,7 @@ def mr_signal(wm_vf, wm_t1, wm_t2,
         Background volume fraction
     te : double
         echo time (s)
-    tr : double 
+    tr : double
         repetition time (s)
 
     Returns
@@ -180,12 +179,12 @@ def rician_noise(image, sigma, rng=None):
 
     Parameters
     ----------
-    image : array-like, shape ``(dim_x, dim_y, dim_z)`` or ``(dim_x, dim_y, 
+    image : array-like, shape ``(dim_x, dim_y, dim_z)`` or ``(dim_x, dim_y,
         dim_z, K)``
     sigma : double
-
+    rng : random number generator (a numpy.random.RandomState instance).
     """
+
     n1 = rng.normal(loc=0, scale=sigma, size=image.shape)
     n2 = rng.normal(loc=0, scale=sigma, size=image.shape)
     return np.sqrt((image + n1)**2 + n2**2)
-
