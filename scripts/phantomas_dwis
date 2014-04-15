@@ -16,8 +16,8 @@ from phantomas.mr_simul.image_formation \
             mr_signal,
             rician_noise)
 from phantomas.mr_simul.fod \
-    import (compute_directions, 
-            compute_fod, 
+    import (compute_directions,
+            compute_fod,
             compute_fod_sh)
 from phantomas.utils import shm
 from phantomas.mr_simul.synthetic import GaussianModel
@@ -57,6 +57,7 @@ parser.add_argument('--fov', type=float, default=None,
 parser.add_argument('--snr', type=float, default=100.,
                     help="Signal-to-noise ratio of the simulated images. "
                          "0.0 for noise-free images")
+
 parser.add_argument('--seed', type=int, default=None,
                      help="Seed for the random number generator.")
 parser.add_argument('--order_sh', type=int, default=8,
@@ -64,6 +65,8 @@ parser.add_argument('--order_sh', type=int, default=8,
 parser.add_argument('--export_fod', default=None,
                      help="Either 'dipy' or 'mrtrix': sets the convention of."
                           "the exported FODs.")
+parser.add_argument('--export_vf',  action='store_true', required=False,
+                   default=False, help='If supplied, saves the volume fraction for each tissue type.')
 args = parser.parse_args()
 
 
@@ -129,7 +132,6 @@ gradient_directions = bvecs[indices_dwis]
 gradient_bvals = bvals[indices_dwis]
 np.clip(gradient_directions, -1, 1, gradient_directions)
 
-
 print "Preparing diffusion-weighted images..."
 ###############################################
 
@@ -150,6 +152,18 @@ background_vf, gm_vf, wm_vf, csf_vf = \
                              fibers, fiber_masks,
                              region_centers, region_radii, region_masks,
                              args.res, phantom_fov)
+
+if args.export_vf:
+    print "Exporting volume fraction."
+
+    gm_vf_img = nib.Nifti1Image(gm_vf, affine)
+    nib.save(gm_vf_img, "gm_vf.nii.gz")
+
+    wm_vf_img = nib.Nifti1Image(wm_vf, affine)
+    nib.save(wm_vf_img, "wm_vf.nii.gz")
+
+    csf_vf_img = nib.Nifti1Image(csf_vf, affine)
+    nib.save(csf_vf_img, "csf_vf.nii.gz")
 
 
 print "\tPreparing relaxation time fields for each tissue."
@@ -181,7 +195,7 @@ for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
     fod_weights /= fod_weights.sum()
 #    fods[i, j, k] = compute_fod(fod_samples, fod_weights, kappa=50, sh=True,
 #                                order_sh=order_sh)
-    fods[i, j, k] = compute_fod_sh(fod_samples, fod_weights, kappa=50, 
+    fods[i, j, k] = compute_fod_sh(fod_samples, fod_weights, kappa=50,
                                    order_sh=order_sh)
 
 
