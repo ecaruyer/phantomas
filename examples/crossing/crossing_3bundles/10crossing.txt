@@ -1,0 +1,27 @@
+{
+  "fiber_geometries" : {
+    "fiber090": {
+      "control_points":
+        [  0.0, 50.0, 0.0,
+           0.0,-50.0, 0.0],
+      "tangents": "symmetric",
+      "radius": 4.0
+    },
+    "fiber010": {
+      "control_points":
+        [ 49.2,  8.7, 0.0,
+         -49.2, -8.7, 0.0],
+      "tangents": "symmetric",
+      "radius": 4.0
+    },
+    "fiber170": {
+      "control_points":
+        [ -49.2, 8.7, 0.0,
+         49.2, -8.7, 0.0],
+      "tangents": "symmetric",
+      "radius": 4.0
+    }
+  }
+}
+
+
