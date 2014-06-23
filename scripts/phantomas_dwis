@@ -61,9 +61,9 @@ parser.add_argument('--snr', type=float, default=100.,
 parser.add_argument('--seed', type=int, default=None,
                      help="Seed for the random number generator.")
 parser.add_argument('--lambda1', type=float, default=1.7e-3,
-                     help="Lambda 1 parameter of the fiber tensor")
+                     help="Lambda 1 parameter of the fiber tensor.")
 parser.add_argument('--lambda2', type=float, default=0.2e-3,
-                     help="Lambda 2 and 3 parameters of the fiber tensor")
+                     help="Lambda 2 and 3 parameters of the fiber tensor.")
 parser.add_argument('--order_sh', type=int, default=8,
                      help="Spherical Harmonics truncation order for the FOD.")
 parser.add_argument('--export_fod', default=None,
@@ -71,6 +71,8 @@ parser.add_argument('--export_fod', default=None,
                           "the exported FODs.")
 parser.add_argument('--export_vf',  action='store_true', required=False,
                    default=False, help='If supplied, saves the volume fraction for each tissue type.')
+parser.add_argument('--output', dest='output', required=False, default="dwis.nii.gz",
+                    help="Output file name. (dwis.nii.gz)")
 args = parser.parse_args()
 
 
@@ -275,4 +277,4 @@ dwis = np.asarray(scale * dwis, dtype=np.int16)
 
 print "\tWrite images to disk"
 dwis_img = nib.Nifti1Image(dwis, affine)
-nib.save(dwis_img, os.path.join(args.output_dir, "dwis.nii.gz"))
+nib.save(dwis_img, os.path.join(args.output_dir, args.output))
