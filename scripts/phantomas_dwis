@@ -58,9 +58,12 @@ parser.add_argument('--fov', type=float, default=None,
 parser.add_argument('--snr', type=float, default=100.,
                     help="Signal-to-noise ratio of the simulated images. "
                          "0.0 for noise-free images")
-
 parser.add_argument('--seed', type=int, default=None,
                      help="Seed for the random number generator.")
+parser.add_argument('--lambda1', type=float, default=1.7e-3,
+                     help="Lambda 1 parameter of the fiber tensor")
+parser.add_argument('--lambda2', type=float, default=0.2e-3,
+                     help="Lambda 2 and 3 parameters of the fiber tensor")
 parser.add_argument('--order_sh', type=int, default=8,
                      help="Spherical Harmonics truncation order for the FOD.")
 parser.add_argument('--export_fod', default=None,
@@ -209,10 +212,9 @@ if args.export_fod is not None:
 
 
 print "\tPrepare synthetic model of diffusion and convolution with FOD."
-lambda1 = 1.7e-3
-lambda2 = 0.2e-3
+lambda1 = args.lambda1
+lambda2 = args.lambda2
 model = GaussianModel(lambda1, lambda2)
-
 signal_operators = {}
 tau = 50e-3  # diffusion time: 50ms
 unique_bvals = set(bvals[indices_dwis].tolist())
