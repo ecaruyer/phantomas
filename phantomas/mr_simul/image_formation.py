@@ -89,6 +89,29 @@ _physical_parameters = {
     },
 }
 
+def get_tissue_physical_parameters(tissue_type):
+    """
+    Return mean physical parameters for a tissue type.
+
+    Parameters
+    ----------
+    tissue_type : 'wm', 'gm', 'csf'
+        The tissue type, either white matter (WM), gray matter (GM), or
+        cerebro-spinal fluid (CSF).
+
+    Returns
+    -------
+    t1 : float
+        t1 mean relaxation time
+    t2 : float
+        t2 mean relaxation time
+    rho : float
+        proton density
+
+    """
+    return (_physical_parameters[tissue_type]['t1']['mean'], 
+            _physical_parameters[tissue_type]['t2']['mean'], 
+            _physical_parameters[tissue_type]['rho'])
 
 def relaxation_time_images(image_shape, tissue_type, rng=None):
     """

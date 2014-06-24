@@ -14,7 +14,8 @@ from phantomas.mr_simul.partial_volume \
 from phantomas.mr_simul.image_formation \
     import (relaxation_time_images,
             mr_signal,
-            rician_noise)
+            rician_noise,
+            get_tissue_physical_parameters)
 from phantomas.mr_simul.fod \
     import (compute_directions,
             compute_fod,
@@ -261,7 +262,9 @@ dwis = b0_wm[..., np.newaxis] * wm_attenuation \
 
 print "\tCorrupt images by Rician noise"
 if args.snr > 0.:
-    sigma = 1 / args.snr
+    wm_mean_t1, wm_mean_t2, wm_rho = get_tissue_physical_parameters('wm')  
+    s0 = wm_rho * (1.0 - np.exp(-tr / wm_mean_t1)) * np.exp(-te / wm_mean_t2)    
+    sigma = s0 / args.snr
     dwis = rician_noise(dwis, sigma, rng=rng)
 
 print "\tChange image type to INT16"
