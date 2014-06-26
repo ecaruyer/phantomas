@@ -48,26 +48,32 @@ parser.add_argument('-b', dest='bvals', required=True,
                     help="b-values in a text file.")
 parser.add_argument('-r', dest='bvecs', required=True,
                     help="b-vectors in a text file.")
-parser.add_argument('-o', dest="output_dir", default=".",
-    help="Output directory.")
+parser.add_argument('--output_dir', default="./",
+                    help="Output directory. (%(default)s)")
+parser.add_argument('--output', dest='output', required=False, default="dwis.nii.gz",
+                    help="Output dwis file name. (%(default)s)")
 parser.add_argument('--res', type=float, default=2.0,
-    help="Diffusion-weighted images resolution in mm.")
+                    help="Diffusion-weighted images resolution in mm. (%(default)s)")
 parser.add_argument('--fov', type=float, default=None,
                     help="Field of view in mm. If None, adapts to the size "
                          "of the phantom.")
 parser.add_argument('--snr', type=float, default=100.,
                     help="Signal-to-noise ratio of the simulated images. "
-                         "0.0 for noise-free images")
-
+                         "0.0 for noise-free images. (%(default)s)")
 parser.add_argument('--seed', type=int, default=None,
-                     help="Seed for the random number generator.")
-parser.add_argument('--order_sh', type=int, default=8,
-                     help="Spherical Harmonics truncation order for the FOD.")
-parser.add_argument('--export_fod', default=None,
-                     help="Either 'dipy' or 'mrtrix': sets the convention of."
+                     help="Seed for the random number generator. (%(default)s)")
+parser.add_argument('--lambda1', type=float, default=1.7e-3,
+                     help="Lambda 1 parameter of the fiber tensor. (%(default)s)")
+parser.add_argument('--lambda2', type=float, default=0.2e-3,
+                     help="Lambda 2 and 3 parameters of the fiber tensor. (%(default)s)")
+parser.add_argument('--order_sh', type=int, default=8, metavar='ORDER',
+                     help="Spherical harmonics truncation order for the FOD. (%(default)s)")
+parser.add_argument('--export_fod', default=None, metavar='BASIS',
+                     help="Either 'dipy' or 'mrtrix': sets the convention of "
                           "the exported FODs.")
 parser.add_argument('--export_vf',  action='store_true', required=False,
                    default=False, help='If supplied, saves the volume fraction for each tissue type.')
+
 args = parser.parse_args()
 
 
@@ -209,10 +215,9 @@ if args.export_fod is not None:
 
 
 print "\tPrepare synthetic model of diffusion and convolution with FOD."
-lambda1 = 1.7e-3
-lambda2 = 0.2e-3
+lambda1 = args.lambda1
+lambda2 = args.lambda2
 model = GaussianModel(lambda1, lambda2)
-
 signal_operators = {}
 tau = 50e-3  # diffusion time: 50ms
 unique_bvals = set(bvals[indices_dwis].tolist())
@@ -273,4 +278,4 @@ dwis = np.asarray(scale * dwis, dtype=np.int16)
 
 print "\tWrite images to disk"
 dwis_img = nib.Nifti1Image(dwis, affine)
-nib.save(dwis_img, os.path.join(args.output_dir, "dwis.nii.gz"))
+nib.save(dwis_img, os.path.join(args.output_dir, args.output))
