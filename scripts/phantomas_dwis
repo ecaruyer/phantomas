@@ -48,9 +48,9 @@ parser.add_argument('-b', dest='bvals', required=True,
                     help="b-values in a text file.")
 parser.add_argument('-r', dest='bvecs', required=True,
                     help="b-vectors in a text file.")
-parser.add_argument('-o', dest="output_dir", default="./",
+parser.add_argument('--output_dir', default="./",
                     help="Output directory. (%(default)s)")
-parser.add_argument('--output', dest='dwis', required=False, default="dwis.nii.gz",
+parser.add_argument('--output', dest='output', required=False, default="dwis.nii.gz",
                     help="Output dwis file name. (%(default)s)")
 parser.add_argument('--res', type=float, default=2.0,
                     help="Diffusion-weighted images resolution in mm. (%(default)s)")
@@ -278,4 +278,4 @@ dwis = np.asarray(scale * dwis, dtype=np.int16)
 
 print "\tWrite images to disk"
 dwis_img = nib.Nifti1Image(dwis, affine)
-nib.save(dwis_img, os.path.join(args.output_dir, args.dwis))
+nib.save(dwis_img, os.path.join(args.output_dir, args.output))
