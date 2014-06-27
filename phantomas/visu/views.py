@@ -1,11 +1,10 @@
 """
-Views (in ``vtk``) for end points and fibers.
+Views (in ``vtk``) for fibers and isotropic regions.
 """
 import vtk
 from matplotlib.colors import colorConverter
 import numpy as np
 
-_vtk_major_version = vtk.vtkVersion.GetVTKMajorVersion()
 
 class ViewFiber():
     """
@@ -61,7 +60,9 @@ class ViewFiber():
 
         text_actor1 = vtk.vtkActor()
         text_actor1.SetMapper(text_mapper)
-        text_actor1.GetProperty().SetColor(rgb_color[0], rgb_color[1], rgb_color[2])
+        text_actor1.GetProperty().SetColor(rgb_color[0], 
+                                           rgb_color[1], 
+                                           rgb_color[2])
         text_actor1.SetScale(1.0)
         center1 = text_actor1.GetCenter()
         text_actor1.RotateX(90)
@@ -69,7 +70,9 @@ class ViewFiber():
 
         text_actor2 = vtk.vtkActor()
         text_actor2.SetMapper(text_mapper)
-        text_actor2.GetProperty().SetColor(rgb_color[0], rgb_color[1], rgb_color[2])
+        text_actor2.GetProperty().SetColor(rgb_color[0], 
+                                           rgb_color[1], 
+                                           rgb_color[2])
         text_actor2.SetScale(1.0)
         center2 = text_actor2.GetCenter()
         text_actor2.RotateX(90)
@@ -95,8 +98,9 @@ class ViewFiber():
 
 
     def notify(self, fiber):
-        """If the internal structure of a fiber has changed, we need to modify the
-	vtk objects accordingly."""
+        """
+        If the internal structure of a fiber has changed, we need to modify 
+        the vtk objects accordingly."""
         self.draw(fiber)
 
 
@@ -106,7 +110,8 @@ class ViewIsotropicRegion():
     to a vtk renderer.
     """
     def __init__(self, isotropic_region, ren, **kwargs):
-        self.init_draw(isotropic_region.center, isotropic_region.radius, ren, **kwargs)
+        self.init_draw(isotropic_region.center, isotropic_region.radius, ren, 
+                       **kwargs)
 
 
     def init_draw(self, center, radius, ren, **kwargs):
@@ -125,7 +130,9 @@ class ViewIsotropicRegion():
 
         sphere_actor = vtk.vtkActor()
         sphere_actor.SetMapper(sphere_mapper)
-        sphere_actor.GetProperty().SetColor(rgb_color[0], rgb_color[1], rgb_color[2])
+        sphere_actor.GetProperty().SetColor(rgb_color[0], 
+                                            rgb_color[1], 
+                                            rgb_color[2])
 
         transform = vtk.vtkTransform()
         transform.Translate(center[0], center[1], center[2])
@@ -142,7 +149,9 @@ class ViewIsotropicRegion():
         text_mapper.SetInputConnection(text_source.GetOutputPort())         
         text_actor1 = vtk.vtkActor()
         text_actor1.SetMapper(text_mapper)
-        text_actor1.GetProperty().SetColor(rgb_color[0], rgb_color[1], rgb_color[2])
+        text_actor1.GetProperty().SetColor(rgb_color[0], 
+                                           rgb_color[1], 
+                                           rgb_color[2])
         text_actor1.SetScale(0.05)
         center1 = text_actor1.GetCenter()
         text_actor1.RotateX(90)
@@ -156,7 +165,9 @@ class ViewIsotropicRegion():
 
 
 class ViewSphere():
-    """Simply adds a translucent sphere (representing cortical surface)."""
+    """
+    Simply adds a translucent sphere (representing cortical surface).
+    """
     def __init__(self, radius, ren, **kwargs):
         self.init_draw(radius, ren, **kwargs)
 
@@ -176,7 +187,9 @@ class ViewSphere():
 
         sphere_actor = vtk.vtkActor()
         sphere_actor.SetMapper(sphere_mapper)
-        sphere_actor.GetProperty().SetColor(rgb_color[0], rgb_color[1], rgb_color[2])
+        sphere_actor.GetProperty().SetColor(rgb_color[0], 
+                                            rgb_color[1], 
+                                            rgb_color[2])
         sphere_actor.GetProperty().SetOpacity(opacity)
 
         ren.AddActor(sphere_actor)
