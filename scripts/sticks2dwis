@@ -113,15 +113,15 @@ image_shape = gm_vf.shape
 print "\tReading sticks and corresponding volume fractions."
 nsf = len(args.dirs)
 
-sticks = nb.load(args.dirs[0]).get_data()[..., np.newaxis]
-sf_vfs = np.nan_to_num(nb.load(args.sticks_vfs[0]).get_data())
+sticks = np.nan_to_num(nb.load(args.dirs[0]).get_data())[..., np.newaxis]
+sf_vfs = np.nan_to_num(nb.load(args.sticks_vfs[0]).get_data())[..., np.newaxis]
 
 for i in range(1, nsf):
-    stdata = np.nan_to_num(nb.load(args.dirs[i]).get_data())[..., np.newaxis]
-    sticks = np.concatenate((sticks, stdata), axis=4)
+    stdata = np.nan_to_num(nb.load(args.dirs[i]).get_data())
+    sticks = np.concatenate((sticks, stdata[..., np.newaxis]), axis=4)
 
     vfdata = np.nan_to_num(nb.load(args.sticks_vfs[i]).get_data())
-    sf_vfs = np.concatenate((sf_vfs, vfdata), axis=3)
+    sf_vfs = np.concatenate((sf_vfs, vfdata[..., np.newaxis]), axis=3)
 
 wm_mask = np.zeros(image_shape)
 wm_mask[sf_vfs.sum(axis=3) > 0] = 1
@@ -160,11 +160,9 @@ fods = np.zeros((dim_x, dim_y, dim_z, dim_sh))
 wm_indices = np.nonzero(wm_mask)
 
 for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
-    fod_samples = sticks[i, j, k, ...]
+    fod_samples = sticks[i, j, k, ...].T
     fod_weights = sf_vfs[i, j, k]
-
-    print fod_samples.shape
-
+    fod_weights /= fod_weights.sum()
     fods[i, j, k] = compute_fod(fod_samples, fod_weights,
                                 kappa=50, sh=True, order_sh=order_sh)
 
