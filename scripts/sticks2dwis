@@ -108,6 +108,7 @@ gm_vf /= total_vf
 wm_vf /= total_vf
 background_vf /= total_vf
 image_shape = gm_vf.shape
+affine = vfs_im[0].get_affine()
 
 
 print "\tReading sticks and corresponding volume fractions."
