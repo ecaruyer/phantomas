@@ -49,6 +49,10 @@ parser.add_argument('--output_dir', default="./",
 parser.add_argument('--output', dest='output', required=False,
                     default="dwis.nii.gz",
                     help="Output dwis file name. (%(default)s)")
+parser.add_argument('--out_mask', dest='mskfile', required=False,
+                    default="mask.nii.gz",
+                    help="Output mask file name. (%(default)s)")
+
 
 parser.add_argument('--tissue_vf', dest='tissue_vf_fname', required=True,
                     nargs='+', help="input csf volume fraction map")
@@ -77,6 +81,14 @@ parser.add_argument(
 parser.add_argument(
     '--lambda2', type=float, default=0.2e-3,
     help="Lambda 2 and 3 parameters of the fiber tensor. (%(default)s)")
+parser.add_argument(
+    '--diff_csf', type=float, default=3.0e-3,
+    help="Diffusivity of liquid. (%(default)s)")
+parser.add_argument(
+    '--diff_gm', type=float, default=.7e-3,
+    help="Diffusivity of gray matter. (%(default)s)")
+
+
 parser.add_argument(
     '--order_sh', type=int, default=8, metavar='ORDER',
     help="Spherical harmonics truncation order for the FOD. (%(default)s)")
@@ -110,6 +122,9 @@ background_vf /= total_vf
 image_shape = gm_vf.shape
 affine = vfs_im[0].get_affine()
 
+outmsk = np.ones_like(background_vf, dtype=np.uint8)
+outmsk[background_vf > 0.0] = 0
+nb.Nifti1Image(outmsk, affine, None).to_filename(args.mskfile)
 
 print "\tReading sticks and corresponding volume fractions."
 nsf = len(args.dirs)
@@ -203,11 +218,11 @@ wm_attenuation[..., indices_dwis] = np.dot(fods, H.T)
 wm_attenuation_img = nb.Nifti1Image(wm_attenuation, affine)
 nb.save(wm_attenuation_img, "wm_attenuation.nii.gz")
 
-gm_diffusivity = 0.2e-3
+gm_diffusivity = args.diff_gm
 gm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
     * np.exp(-bvals * gm_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
 
-csf_diffusivity = 3.0e-3
+csf_diffusivity = args.diff_csf 
 csf_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
     * np.exp(-bvals * csf_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
 
