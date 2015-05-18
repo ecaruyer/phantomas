@@ -51,7 +51,7 @@ parser.add_argument('--output', dest='output', required=False,
                     help="Output dwis file name. (%(default)s)")
 
 parser.add_argument('--tissue_vf', dest='tissue_vf_fname', required=True,
-                    help="input csf volume fraction map")
+                    nargs='+', help="input csf volume fraction map")
 parser.add_argument('--sticks_dir', dest='dirs', required=True, nargs='+',
                     help='directions of fibers to be simulated')
 parser.add_argument(
@@ -114,11 +114,14 @@ print "\tReading sticks and corresponding volume fractions."
 nsf = len(args.dirs)
 
 sticks = nb.load(args.dirs[0]).get_data()[..., np.newaxis]
-sf_vfs = nb.load(args.sticks_vfs[0]).get_data()[..., np.newaxis]
+sf_vfs = np.nan_to_num(nb.load(args.sticks_vfs[0]).get_data())
 
 for i in range(1, nsf):
-    np.concat((sticks, nb.load(args.dirs[0])), axis=4)
-    np.concat((sf_vfs, nb.load(args.sticks_vfs[0])), axis=3)
+    stdata = np.nan_to_num(nb.load(args.dirs[i]).get_data())[..., np.newaxis]
+    sticks = np.concatenate((sticks, stdata), axis=4)
+
+    vfdata = np.nan_to_num(nb.load(args.sticks_vfs[i]).get_data())
+    sf_vfs = np.concatenate((sf_vfs, vfdata), axis=3)
 
 wm_mask = np.zeros(image_shape)
 wm_mask[sf_vfs.sum(axis=3) > 0] = 1
@@ -159,6 +162,8 @@ wm_indices = np.nonzero(wm_mask)
 for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
     fod_samples = sticks[i, j, k, ...]
     fod_weights = sf_vfs[i, j, k]
+
+    print fod_samples.shape
 
     fods[i, j, k] = compute_fod(fod_samples, fod_weights,
                                 kappa=50, sh=True, order_sh=order_sh)
