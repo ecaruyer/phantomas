@@ -22,7 +22,7 @@ from phantomas.mr_simul.fod \
             compute_fod_sh)
 from phantomas.utils import shm
 from phantomas.mr_simul.synthetic import GaussianModel
-import nibabel as nib
+import nibabel as nb
 import sys
 
 
@@ -36,8 +36,8 @@ def is_valid_file(parser, arg):
 
 # The command-line arguments parser.
 ####################################
-description = "Simulates diffusion-weighted images from the description of a " \
-    "phantom."
+description = ("Simulates diffusion-weighted images from the description "
+               "of a phantom.")
 
 parser = argparse.ArgumentParser(description=description)
 parser.add_argument('-b', dest='bvals', required=True,
@@ -46,38 +46,82 @@ parser.add_argument('-r', dest='bvecs', required=True,
                     help="b-vectors in a text file.")
 parser.add_argument('--output_dir', default="./",
                     help="Output directory. (%(default)s)")
-parser.add_argument('--output', dest='output', required=False, default="dwis.nii.gz",
+parser.add_argument('--output', dest='output', required=False,
+                    default="dwis.nii.gz",
                     help="Output dwis file name. (%(default)s)")
-parser.add_argument('--res', type=float, default=2.0,
-                    help="Diffusion-weighted images resolution in mm. (%(default)s)")
-parser.add_argument('--fov', type=float, default=None,
-                    help="Field of view in mm. If None, adapts to the size "
-                         "of the phantom.")
-parser.add_argument('--snr', type=float, default=100.,
-                    help="Signal-to-noise ratio of the simulated images. "
-                         "0.0 for noise-free images. (%(default)s)")
+
+parser.add_argument('--tissue_vf', dest='tissue_vf_fname', required=True,
+                    help="input csf volume fraction map")
+parser.add_argument('--sticks_dir', dest='dirs', required=True, nargs='+',
+                    help='directions of fibers to be simulated')
+parser.add_argument(
+    '--sticks_vfs', dest='sticks_vfs', required=True, nargs='+',
+    help='volume fractions of fibers to be simulated')
+
+parser.add_argument(
+    '--res', type=float, default=2.0,
+    help="Diffusion-weighted images resolution in mm. (%(default)s)")
+parser.add_argument(
+    '--fov', type=float, default=None,
+    help="Field of view in mm. If None, adapts to the size of the phantom.")
+
+parser.add_argument(
+    '--snr', type=float, default=100.,
+    help="Signal-to-noise ratio of the simulated images. "
+    "0.0 for noise-free images. (%(default)s)")
 parser.add_argument('--seed', type=int, default=None,
                     help="Seed for the random number generator. (%(default)s)")
-parser.add_argument('--lambda1', type=float, default=1.7e-3,
-                    help="Lambda 1 parameter of the fiber tensor. (%(default)s)")
-parser.add_argument('--lambda2', type=float, default=0.2e-3,
-                    help="Lambda 2 and 3 parameters of the fiber tensor. (%(default)s)")
-parser.add_argument('--order_sh', type=int, default=8, metavar='ORDER',
-                    help="Spherical harmonics truncation order for the FOD. (%(default)s)")
+parser.add_argument(
+    '--lambda1', type=float, default=1.7e-3,
+    help="Lambda 1 parameter of the fiber tensor. (%(default)s)")
+parser.add_argument(
+    '--lambda2', type=float, default=0.2e-3,
+    help="Lambda 2 and 3 parameters of the fiber tensor. (%(default)s)")
+parser.add_argument(
+    '--order_sh', type=int, default=8, metavar='ORDER',
+    help="Spherical harmonics truncation order for the FOD. (%(default)s)")
 parser.add_argument('--export_fod', default=None, metavar='BASIS',
                     help="Either 'dipy' or 'mrtrix': sets the convention of "
                     "the exported FODs.")
 
 args = parser.parse_args()
 
-print "\tReading volume fractions of each tissue type."
-# background_vf, gm_vf, wm_vf, csf_vf
+print "\tReading volume fractions of tissues."
+vfs_im = []
+for f in args.tissue_vf_fname:
+    vfs_im.append(nb.load(f))
 
-print "\tComputing mask for each structure."
-# gm_mask, fiber_masks, region_masks
+csf_vf = vfs_im[0].get_data()
+gm_vf = vfs_im[1].get_data()
+wm_vf = vfs_im[2].get_data()
+
+total_vf = csf_vf + gm_vf + wm_vf
+background_vf = np.ones_like(csf_vf) - total_vf
+total_vf += background_vf
+
+if np.any(total_vf <= 0.0):
+    background_vf[total_vf <= 0.0] = 1.0
+    total_vf[total_vf <= 0.0] = 1.0
+
+csf_vf /= total_vf
+gm_vf /= total_vf
+wm_vf /= total_vf
+background_vf /= total_vf
+image_shape = gm_vf.shape
+
 
 print "\tReading sticks and corresponding volume fractions."
-# fod_samples, fod_weights
+nsf = len(args.dirs)
+
+sticks = nb.load(args.dirs[0]).get_data()[..., np.newaxis]
+sf_vfs = nb.load(args.sticks_vfs[0]).get_data()[..., np.newaxis]
+
+for i in range(1, nsf):
+    np.concat((sticks, nb.load(args.dirs[0])), axis=4)
+    np.concat((sf_vfs, nb.load(args.sticks_vfs[0])), axis=3)
+
+wm_mask = np.zeros(image_shape)
+wm_mask[sf_vfs.sum(axis=3) > 0] = 1
 
 print "\tReading acquisition sequence..."
 bvals = np.loadtxt(args.bvals)
@@ -100,7 +144,6 @@ print "Preparing diffusion-weighted images..."
 print "\tPreparing relaxation time fields for each tissue."
 # First initialize the random number generator - if seed provided
 rng = np.random.RandomState(args.seed)
-image_shape = gm_mask.shape
 dim_x, dim_y, dim_z = image_shape
 wm_t1, wm_t2 = relaxation_time_images(image_shape, 'wm', rng=rng)
 gm_t1, gm_t2 = relaxation_time_images(image_shape, 'gm', rng=rng)
@@ -111,28 +154,25 @@ print "\tComputing fiber orientation distribution."
 order_sh = args.order_sh
 dim_sh = shm.dimension(order_sh)
 fods = np.zeros((dim_x, dim_y, dim_z, dim_sh))
-wm_mask = np.any(fiber_masks > 0, axis=-1)
 wm_indices = np.nonzero(wm_mask)
 
 for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
-    voxel_center = np.dot(affine, np.asarray([i, j, k, 1.0]))[:3]
-    fiber_indices = np.nonzero(fiber_masks[i, j, k])[0]
-    # TODO: compute fods here
+    fod_samples = sticks[i, j, k, ...]
+    fod_weights = sf_vfs[i, j, k]
 
-    fod_weights /= fod_weights.sum()
-    fods[i, j, k] = compute_fod(fod_samples, fod_weights, kappa=50, sh=True,
-                                order_sh=order_sh)
+    fods[i, j, k] = compute_fod(fod_samples, fod_weights,
+                                kappa=50, sh=True, order_sh=order_sh)
 
 
 if args.export_fod is not None:
     print "Exporting fods following %s's convention." % args.export_fod
     if args.export_fod == "dipy":
-        fods_img = nib.Nifti1Image(fods * wm_vf[..., np.newaxis], affine)
+        fods_img = nb.Nifti1Image(fods * wm_vf[..., np.newaxis], affine)
     elif args.export_fod == "mrtrix":
         conversion_matrix = shm.convert_to_mrtrix(order_sh)
-        fods_img = nib.Nifti1Image(np.dot(fods, conversion_matrix.T)
-                                   * wm_vf[..., np.newaxis], affine)
-    nib.save(fods_img, "fods.nii.gz")
+        fods_img = nb.Nifti1Image(np.dot(fods, conversion_matrix.T)
+                                  * wm_vf[..., np.newaxis], affine)
+    nb.save(fods_img, "fods.nii.gz")
 
 
 print "\tPrepare synthetic model of diffusion and convolution with FOD."
@@ -156,8 +196,8 @@ print "\tCompute diffusion signal attenuation."
 wm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions))
 wm_attenuation[..., indices_dwis] = np.dot(fods, H.T)
 
-wm_attenuation_img = nib.Nifti1Image(wm_attenuation, affine)
-nib.save(wm_attenuation_img, "wm_attenuation.nii.gz")
+wm_attenuation_img = nb.Nifti1Image(wm_attenuation, affine)
+nb.save(wm_attenuation_img, "wm_attenuation.nii.gz")
 
 gm_diffusivity = 0.2e-3
 gm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
@@ -198,5 +238,5 @@ scale = 2 ** 14
 dwis = np.asarray(scale * dwis, dtype=np.int16)
 
 print "\tWrite images to disk"
-dwis_img = nib.Nifti1Image(dwis, affine)
-nib.save(dwis_img, os.path.join(args.output_dir, args.output))
+dwis_img = nb.Nifti1Image(dwis, affine)
+nb.save(dwis_img, os.path.join(args.output_dir, args.output))
