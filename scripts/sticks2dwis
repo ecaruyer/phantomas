@@ -76,7 +76,7 @@ parser.add_argument(
 parser.add_argument('--seed', type=int, default=None,
                     help="Seed for the random number generator. (%(default)s)")
 parser.add_argument(
-    '--lambda1', type=float, default=1.7e-3,
+    '--lambda1', type=float, default=2.2e-3,
     help="Lambda 1 parameter of the fiber tensor. (%(default)s)")
 parser.add_argument(
     '--lambda2', type=float, default=0.2e-3,
@@ -87,14 +87,21 @@ parser.add_argument(
 parser.add_argument(
     '--diff_gm', type=float, default=.7e-3,
     help="Diffusivity of gray matter. (%(default)s)")
+parser.add_argument(
+    '--diff_wm', type=float, default=1.2e-3,
+    help="Diffusivity of gray matter. (%(default)s)")
 
+parser.add_argument(
+    '--out_type', default='int16', choices=['float', 'int16', 'uint8'],
+    help='output file type')
 
 parser.add_argument(
     '--order_sh', type=int, default=8, metavar='ORDER',
     help="Spherical harmonics truncation order for the FOD. (%(default)s)")
-parser.add_argument('--export_fod', default=None, metavar='BASIS',
-                    help="Either 'dipy' or 'mrtrix': sets the convention of "
-                    "the exported FODs.")
+parser.add_argument(
+    '--export_fod', default=None, choices=['dipy', 'mrtrix'], metavar='BASIS',
+    help=("Either 'dipy' or 'mrtrix': sets the convention of the exported "
+          "FODs."))
 
 args = parser.parse_args()
 
@@ -142,6 +149,14 @@ for i in range(1, nsf):
 wm_mask = np.zeros(image_shape)
 wm_mask[sf_vfs.sum(axis=3) > 0] = 1
 
+print "\tWriting white-matter compartments..."
+wm_restricted = sf_vfs.sum(axis=3)
+wm_free_residual = wm_vf - wm_restricted
+wm_free_residual[wm_free_residual < 0.0] = 0.0
+
+nb.Nifti1Image(wm_restricted, affine).to_filename("wm_restricted.nii.gz")
+nb.Nifti1Image(wm_free_residual, affine).to_filename("wm_residual.nii.gz")
+
 print "\tReading acquisition sequence..."
 bvals = np.loadtxt(args.bvals)
 bvecs = np.loadtxt(args.bvecs)
@@ -178,7 +193,6 @@ wm_indices = np.nonzero(wm_mask)
 for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
     fod_samples = sticks[i, j, k, ...].T
     fod_weights = sf_vfs[i, j, k]
-    fod_weights /= fod_weights.sum()
     fods[i, j, k] = compute_fod(fod_samples, fod_weights,
                                 kappa=50, sh=True, order_sh=order_sh)
 
@@ -189,8 +203,8 @@ if args.export_fod is not None:
         fods_img = nb.Nifti1Image(fods * wm_vf[..., np.newaxis], affine)
     elif args.export_fod == "mrtrix":
         conversion_matrix = shm.convert_to_mrtrix(order_sh)
-        fods_img = nb.Nifti1Image(np.dot(fods, conversion_matrix.T)
-                                  * wm_vf[..., np.newaxis], affine)
+        fods_img = nb.Nifti1Image(
+            np.dot(fods, conversion_matrix.T) * wm_vf[..., np.newaxis], affine)
     nb.save(fods_img, "fods.nii.gz")
 
 
@@ -213,7 +227,13 @@ for bval in unique_bvals:
 
 print "\tCompute diffusion signal attenuation."
 wm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions))
-wm_attenuation[..., indices_dwis] = np.dot(fods, H.T)
+wm_attenuation[..., indices_dwis] = np.dot(
+    fods, H.T) * wm_restricted[..., np.newaxis]
+
+wm_freediff = args.diff_wm
+wm_att_free = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
+    * np.exp(-bvals * wm_freediff)[np.newaxis, np.newaxis, np.newaxis, :]
+wm_attenuation += wm_att_free * wm_free_residual[..., np.newaxis]
 
 wm_attenuation_img = nb.Nifti1Image(wm_attenuation, affine)
 nb.save(wm_attenuation_img, "wm_attenuation.nii.gz")
@@ -222,7 +242,7 @@ gm_diffusivity = args.diff_gm
 gm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
     * np.exp(-bvals * gm_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
 
-csf_diffusivity = args.diff_csf 
+csf_diffusivity = args.diff_csf
 csf_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
     * np.exp(-bvals * csf_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
 
@@ -252,10 +272,28 @@ if args.snr > 0.:
     sigma = s0 / args.snr
     dwis = rician_noise(dwis, sigma, rng=rng)
 
-print "\tChange image type to INT16"
-scale = 2 ** 14
-dwis = np.asarray(scale * dwis, dtype=np.int16)
+out_dtype = np.float32
+scale = 2000
+
+if args.out_type != 'float':
+    print "\tChange image type to %s" % args.out_type
+    if args.out_type == 'uint8':
+        out_dtype = np.uint8
+        if np.any(dwis < 0.0):
+            dwis -= dwis.min()
+    elif args.out_type == 'int16':
+        out_dtype = np.int16
+    else:
+        raise NotImplementedError('Only float, uint8 and int16 are allowed')
+
+    scale = np.finfo(out_dtype).max / dwis.max()
+
+dwis = np.asarray(scale * dwis)
 
 print "\tWrite images to disk"
-dwis_img = nb.Nifti1Image(dwis, affine)
-nb.save(dwis_img, os.path.join(args.output_dir, args.output))
+hdr = nb.Nifti1Header()
+hdr.set_data_shape(dwis.shape)
+hdr.set_data_dtype(out_dtype)
+hdr.set_xyzt_units('mm', 'sec')
+nb.Nifti1Image(dwis.astype(out_dtype), affine, hdr).to_filename(
+    os.path.join(args.output_dir, args.output))
