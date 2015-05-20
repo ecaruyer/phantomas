@@ -286,7 +286,7 @@ if args.out_type != 'float':
     else:
         raise NotImplementedError('Only float, uint8 and int16 are allowed')
 
-    scale = np.finfo(out_dtype).max / dwis.max()
+    scale = np.iinfo(out_dtype).max / dwis.max()
 
 dwis = np.asarray(scale * dwis)
 
