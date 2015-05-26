@@ -76,7 +76,7 @@ parser.add_argument(
 parser.add_argument('--seed', type=int, default=None,
                     help="Seed for the random number generator. (%(default)s)")
 parser.add_argument(
-    '--lambda1', type=float, default=2.2e-3,
+    '--lambda1', type=float, default=1.7e-3,
     help="Lambda 1 parameter of the fiber tensor. (%(default)s)")
 parser.add_argument(
     '--lambda2', type=float, default=0.2e-3,
@@ -106,56 +106,49 @@ parser.add_argument(
 args = parser.parse_args()
 
 print "\tReading volume fractions of tissues."
-vfs_im = []
-for f in args.tissue_vf_fname:
-    vfs_im.append(nb.load(f))
+vfs_im = [nb.load(f) for f in args.tissue_vf_fname]
+ts_vfs = np.nan_to_num(nb.concat_images(vfs_im).get_data())
 
-csf_vf = vfs_im[0].get_data()
-gm_vf = vfs_im[1].get_data()
-wm_vf = vfs_im[2].get_data()
-
-total_vf = csf_vf + gm_vf + wm_vf
-background_vf = np.ones_like(csf_vf) - total_vf
-total_vf += background_vf
-
-if np.any(total_vf <= 0.0):
-    background_vf[total_vf <= 0.0] = 1.0
-    total_vf[total_vf <= 0.0] = 1.0
-
-csf_vf /= total_vf
-gm_vf /= total_vf
-wm_vf /= total_vf
-background_vf /= total_vf
-image_shape = gm_vf.shape
+# These will be used along the process
 affine = vfs_im[0].get_affine()
+image_shape = vfs_im[0].get_shape()
 
-outmsk = np.ones_like(background_vf, dtype=np.uint8)
-outmsk[background_vf > 0.0] = 0
-nb.Nifti1Image(outmsk, affine, None).to_filename(args.mskfile)
+print "\tReading volume fractions of fibers."
+sf_img = [nb.load(f) for f in args.sticks_vfs]
+affine = sf_img[0].get_affine()
+sf_vfs = np.nan_to_num(nb.concat_images(sf_img).get_data())
 
-print "\tReading sticks and corresponding volume fractions."
+print "\tReading directions of fibers."
 nsf = len(args.dirs)
-
 sticks = np.nan_to_num(nb.load(args.dirs[0]).get_data())[..., np.newaxis]
-sf_vfs = np.nan_to_num(nb.load(args.sticks_vfs[0]).get_data())[..., np.newaxis]
 
 for i in range(1, nsf):
     stdata = np.nan_to_num(nb.load(args.dirs[i]).get_data())
     sticks = np.concatenate((sticks, stdata[..., np.newaxis]), axis=4)
 
-    vfdata = np.nan_to_num(nb.load(args.sticks_vfs[i]).get_data())
-    sf_vfs = np.concatenate((sf_vfs, vfdata[..., np.newaxis]), axis=3)
+print "\tNormalizing fractions to sum up 1.0..."
+total_vf = np.sum(ts_vfs, axis=3) + np.sum(sf_vfs, axis=3)
+ts_vfs[total_vf > 0] /= total_vf[total_vf > 0, np.newaxis]
+sf_vfs[total_vf > 0] /= total_vf[total_vf > 0, np.newaxis]
+total_vf = np.sum(ts_vfs, axis=3) + np.sum(sf_vfs, axis=3)
 
-wm_mask = np.zeros(image_shape)
-wm_mask[sf_vfs.sum(axis=3) > 0] = 1
+background_vf = np.ones_like(total_vf) - total_vf
 
-print "\tWriting white-matter compartments..."
-wm_restricted = sf_vfs.sum(axis=3)
-wm_free_residual = wm_vf - wm_restricted
-wm_free_residual[wm_free_residual < 0.0] = 0.0
+csf_vf = ts_vfs[..., 0]
+gm_vf = ts_vfs[..., 1]
+wm_vf = ts_vfs[..., 2] + np.sum(sf_vfs, axis=3)
 
-nb.Nifti1Image(wm_restricted, affine).to_filename("wm_restricted.nii.gz")
-nb.Nifti1Image(wm_free_residual, affine).to_filename("wm_residual.nii.gz")
+outmsk = np.zeros_like(total_vf, dtype=np.uint8)
+outmsk[total_vf > 0.0] = 1
+nb.Nifti1Image(outmsk, affine, None).to_filename(args.mskfile)
+
+print "\tWriting fractions that will be simulated..."
+
+for i in range(nsf):
+    nb.Nifti1Image(sf_vfs[..., i], affine).to_filename("vf_sf%02d.nii.gz" % i)
+
+for i in range(len(vfs_im)):
+    nb.Nifti1Image(ts_vfs[..., i], affine).to_filename("vf_iso%02d.nii.gz" % i)
 
 print "\tReading acquisition sequence..."
 bvals = np.loadtxt(args.bvals)
@@ -185,6 +178,7 @@ csf_t1, csf_t2 = relaxation_time_images(image_shape, 'csf', rng=rng)
 
 
 print "\tComputing fiber orientation distribution."
+wm_mask = sf_vfs.sum(axis=3)
 order_sh = args.order_sh
 dim_sh = shm.dimension(order_sh)
 fods = np.zeros((dim_x, dim_y, dim_z, dim_sh))
@@ -208,6 +202,20 @@ if args.export_fod is not None:
     nb.save(fods_img, "fods.nii.gz")
 
 
+print "\tCompute diffusion signal attenuation of isotropic compartments."
+wm_freediff = args.diff_wm
+wm_att_free = ts_vfs[..., 2, np.newaxis] \
+    * np.exp(-bvals * wm_freediff)[np.newaxis, np.newaxis, np.newaxis, :]
+
+gm_diffusivity = args.diff_gm
+gm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
+    * np.exp(-bvals * gm_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
+
+csf_diffusivity = args.diff_csf
+csf_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
+    * np.exp(-bvals * csf_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
+
+
 print "\tPrepare synthetic model of diffusion and convolution with FOD."
 lambda1 = args.lambda1
 lambda2 = args.lambda2
@@ -224,27 +232,11 @@ for bval in unique_bvals:
     indices = (gradient_bvals == bval)
     H[indices] *= rs[np.newaxis, :]
 
-
-print "\tCompute diffusion signal attenuation."
 wm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions))
-wm_attenuation[..., indices_dwis] = np.dot(
-    fods, H.T) * wm_restricted[..., np.newaxis]
-
-wm_freediff = args.diff_wm
-wm_att_free = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
-    * np.exp(-bvals * wm_freediff)[np.newaxis, np.newaxis, np.newaxis, :]
-wm_attenuation += wm_att_free * wm_free_residual[..., np.newaxis]
+wm_attenuation[..., indices_dwis] = np.dot(fods, H.T)
 
 wm_attenuation_img = nb.Nifti1Image(wm_attenuation, affine)
 nb.save(wm_attenuation_img, "wm_attenuation.nii.gz")
-
-gm_diffusivity = args.diff_gm
-gm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
-    * np.exp(-bvals * gm_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
-
-csf_diffusivity = args.diff_csf
-csf_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
-    * np.exp(-bvals * csf_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
 
 
 print "\tCompute diffusion-weighted images"
@@ -263,7 +255,8 @@ b0_csf = mr_signal(0 * wm_vf, wm_t1, wm_t2,
                    te, tr)
 dwis = b0_wm[..., np.newaxis] * wm_attenuation \
     + b0_gm[..., np.newaxis] * gm_attenuation \
-    + b0_csf[..., np.newaxis] * csf_attenuation
+    + b0_csf[..., np.newaxis] * csf_attenuation \
+    + b0_wm[..., np.newaxis] * wm_att_free
 
 print "\tCorrupt images by Rician noise"
 if args.snr > 0.:
