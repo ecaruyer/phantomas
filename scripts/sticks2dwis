@@ -83,8 +83,8 @@ parser.add_argument(
     help="Lambda 2 and 3 parameters of the fiber tensor. (%(default)s)")
 parser.add_argument(
     '--diff_iso', type=float, default=[7.e-4, 9.e-4, 2.e-4, 3.e-3, 1.e-3],
-    nargs=5, help=('Diffusion of isotropic compartments in 5TT format: [cGM, dGM, '
-                   'WM, CSF, pathology] (%(defaults)s)'))
+    nargs=5, help=('Diffusion of isotropic compartments in 5TT format: '
+                   '[cGM, dGM, WM, CSF, pathology] (%(default)s)'))
 
 parser.add_argument(
     '--out_type', default='int16', choices=['float', 'int16', 'uint8'],
@@ -129,8 +129,9 @@ total_vf = np.sum(ts_vfs, axis=3) + np.sum(sf_vfs, axis=3)
 
 background_vf = np.ones_like(total_vf) - total_vf
 
-csf_vf = ts_vfs[..., 0]
-gm_vf = ts_vfs[..., 1]
+gm_vf = ts_vfs[..., 0]
+dgm_vf = ts_vfs[..., 1]
+csf_vf = ts_vfs[..., 3]
 wm_vf = ts_vfs[..., 2] + np.sum(sf_vfs, axis=3)
 
 outmsk = np.zeros_like(total_vf, dtype=np.uint8)
@@ -198,15 +199,19 @@ if args.export_fod is not None:
 
 
 print "\tCompute diffusion signal attenuation of isotropic compartments."
-wm_freediff = args.diff_wm
+wm_freediff = args.diff_iso[2]
 wm_att_free = ts_vfs[..., 2, np.newaxis] \
     * np.exp(-bvals * wm_freediff)[np.newaxis, np.newaxis, np.newaxis, :]
 
-gm_diffusivity = args.diff_gm
+gm_diffusivity = args.diff_iso[0]
 gm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
     * np.exp(-bvals * gm_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
 
-csf_diffusivity = args.diff_csf
+dgm_diffusivity = args.diff_iso[0]
+dgm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
+    * np.exp(-bvals * dgm_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
+
+csf_diffusivity = args.diff_iso[3]
 csf_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
     * np.exp(-bvals * csf_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
 
@@ -244,12 +249,17 @@ b0_gm = mr_signal(0 * wm_vf, wm_t1, wm_t2,
                   gm_vf, gm_t1, gm_t2,
                   0 * csf_vf, csf_t1, csf_t2,
                   te, tr)
+b0_dgm = mr_signal(0 * wm_vf, wm_t1, wm_t2,
+                   dgm_vf, gm_t1, gm_t2,
+                   0 * csf_vf, csf_t1, csf_t2,
+                   te, tr)
 b0_csf = mr_signal(0 * wm_vf, wm_t1, wm_t2,
                    0 * gm_vf, gm_t1, gm_t2,
                    csf_vf, csf_t1, csf_t2,
                    te, tr)
 dwis = b0_wm[..., np.newaxis] * wm_attenuation \
     + b0_gm[..., np.newaxis] * gm_attenuation \
+    + b0_dgm[..., np.newaxis] * dgm_attenuation \
     + b0_csf[..., np.newaxis] * csf_attenuation \
     + b0_wm[..., np.newaxis] * wm_att_free
 
