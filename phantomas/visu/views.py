@@ -5,6 +5,7 @@ import vtk
 from matplotlib.colors import colorConverter
 import numpy as np
 
+major_version = vtk.vtkVersion.GetVTKMajorVersion()
 
 class ViewFiber():
     """
@@ -39,7 +40,10 @@ class ViewFiber():
         # The tube is wrapped around the generated streamline.
         stream_tube = vtk.vtkTubeFilter()
         self.tube = stream_tube
-        stream_tube.SetInput(poly_data)
+        if major_version <= 5:
+            stream_tube.SetInput(poly_data)
+        else:
+            stream_tube.SetInputData(poly_data)
         stream_tube.SetRadius(fiber.get_radius())
         stream_tube.SetNumberOfSides(12)
         stream_tube.SetCapping(True)
