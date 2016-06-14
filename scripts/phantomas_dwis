@@ -164,13 +164,13 @@ if args.export_vf:
     print "Exporting volume fraction."
 
     gm_vf_img = nib.Nifti1Image(gm_vf, affine)
-    nib.save(gm_vf_img, "gm_vf.nii.gz")
+    nib.save(gm_vf_img, os.path.join(args.output_dir, "gm_vf.nii.gz"))
 
     wm_vf_img = nib.Nifti1Image(wm_vf, affine)
-    nib.save(wm_vf_img, "wm_vf.nii.gz")
+    nib.save(wm_vf_img, os.path.join(args.output_dir, "wm_vf.nii.gz"))
 
     csf_vf_img = nib.Nifti1Image(csf_vf, affine)
-    nib.save(csf_vf_img, "csf_vf.nii.gz")
+    nib.save(csf_vf_img, os.path.join(args.output_dir, "csf_vf.nii.gz"))
 
 
 print "\tPreparing relaxation time fields for each tissue."
@@ -211,7 +211,7 @@ if args.export_fod is not None:
         conversion_matrix = shm.convert_to_mrtrix(order_sh)
         fods_img = nib.Nifti1Image(np.dot(fods, conversion_matrix.T) \
                                    * wm_vf[..., np.newaxis], affine)
-    nib.save(fods_img, "fods.nii.gz")
+    nib.save(fods_img, os.path.join(args.output_dir, "fods.nii.gz"))
 
 
 print "\tPrepare synthetic model of diffusion and convolution with FOD."
@@ -236,7 +236,7 @@ wm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions))
 wm_attenuation[..., indices_dwis] = np.dot(fods, H.T)
 
 wm_attenuation_img = nib.Nifti1Image(wm_attenuation, affine)
-nib.save(wm_attenuation_img, "wm_attenuation.nii.gz")
+nib.save(wm_attenuation_img, os.path.join(args.output_dir, "wm_attenuation.nii.gz"))
 
 gm_diffusivity = 0.2e-3
 gm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
