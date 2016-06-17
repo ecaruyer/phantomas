@@ -1,0 +1,8 @@
+Cython==0.23.4
+Phantomas==0.1.dev
+argparse==1.2.1
+nibabel==2.0.1
+numpy==1.10.1
+scikits.sparse==0.2
+scipy==0.16.1
+wsgiref==0.1.2
