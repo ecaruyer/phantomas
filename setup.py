@@ -1,9 +1,18 @@
 from distutils.core import setup
 from distutils.extension import Extension
 from Cython.Distutils import build_ext
+from Cython.Build import cythonize
 import numpy as np
 import os
 
+extensions = [
+    Extension("phantomas.mr_simul.fast_volume_fraction",
+              ["phantomas/mr_simul/fast_volume_fraction.pyx",
+               "phantomas/mr_simul/c_fast_volume_fraction.c"],
+              include_dirs=[np.get_include(), "/usr/local/include/"],
+              library_dirs=["/usr/lib/"],
+              libraries=["gsl", "gslcblas"]),
+]
 
 setup(name='Phantomas',
       description='A software phantom generation tool for diffusion MRI.',
@@ -11,11 +20,12 @@ setup(name='Phantomas',
       author='Emmanuel Caruyer',
       author_email='caruyer@gmail.com',
       url='http://www.emmanuelcaruyer.com/phantomas/',
-      packages=['phantomas', 
-                'phantomas.geometry', 
-                'phantomas.mr_simul', 
+      packages=['phantomas',
+                'phantomas.geometry',
+                'phantomas.mr_simul',
                 'phantomas.utils',
                 'phantomas.visu'],
+<<<<<<< HEAD
       package_data={'phantomas.mr_simul' : ["spherical_21_design.txt"]},
       scripts = [os.path.join('scripts', 'phantomas_struct'),
                  os.path.join('scripts', 'phantomas_dwis'),
@@ -30,4 +40,14 @@ setup(name='Phantomas',
                              include_dirs=[np.get_include(), "/usr/local/include/"],
                              library_dirs=["/usr/lib/"],
                              libraries=["gsl", "gslcblas"])],
+=======
+      package_data={'phantomas.mr_simul': ["spherical_21_design.txt"]},
+      scripts=[os.path.join('scripts', 'phantomas_struct'),
+               os.path.join('scripts', 'phantomas_dwis'),
+               os.path.join('scripts', 'phantomas_rois'),
+               os.path.join('scripts', 'phantomas_masks'),
+               os.path.join('scripts', 'phantomas_view')],
+      # cmdclass={'build_ext': build_ext},
+      ext_modules=cythonize(extensions),
+>>>>>>> master
       )

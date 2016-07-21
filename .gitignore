@@ -35,4 +35,5 @@ nosetests.xml
 .project
 .pydevproject
 
+# Cython module
 phantomas/mr_simul/fast_volume_fraction.c

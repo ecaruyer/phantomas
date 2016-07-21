@@ -197,7 +197,7 @@ class _CachedMatrix():
         sh = sph_harm(np.abs(ms), ls, 
                       phi[:, np.newaxis], theta[:, np.newaxis])
         H = np.where(ms > 0, sh.imag, sh.real)
-        H[ms != 0] *= np.sqrt(2)
+        H[:, (ms != 0)[0]] *= np.sqrt(2)
         return H
 
 matrix = _CachedMatrix()
