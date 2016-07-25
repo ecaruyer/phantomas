@@ -25,7 +25,8 @@ def compute_affine_matrix(voxel_size, image_size):
     """
     affine = np.eye(4)
     affine[:3, :3] = voxel_size * np.eye(3)
-    affine[:3, 3] = -0.5 * image_size + 0.5 * voxel_size
+    actual_image_size = int(image_size / voxel_size) * voxel_size
+    affine[:3, 3] = -0.5 * actual_image_size + 0.5 * voxel_size
     return affine
 
 
