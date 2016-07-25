@@ -1,0 +1,309 @@
+#!/usr/bin/env python
+"""
+Example script to be used with the Diffantom
+--------------------------------------------
+
+This is the script used by Diffantom [Esteban2016]_
+
+  .. [Esteban2016] Esteban O. et al., Diffantom: whole-brain diffusion MRI phantoms
+       derived from real datasets of the Human Connectome Project, Front. Neuroinf. 10(4),
+       2016. doi:`10.3389/fninf.2016.00004 <http://dx.doi.org/10.3389/fninf.2016.00004>`_.
+
+"""
+
+from __future__ import division
+import argparse
+import json
+import os
+import numpy as np
+from phantomas.geometry.fiber import FiberSource
+from phantomas.geometry.models import Fiber, IsotropicRegion
+from phantomas.mr_simul.partial_volume \
+    import (compute_affine_matrix,
+            compute_spherical_region_masks,
+            compute_fiber_masks,
+            compute_volume_fractions)
+from phantomas.mr_simul.image_formation \
+    import (relaxation_time_images,
+            mr_signal,
+            rician_noise,
+            get_tissue_physical_parameters)
+from phantomas.mr_simul.fod \
+    import (compute_directions,
+            compute_fod,
+            compute_fod_sh)
+from phantomas.utils import shm
+from phantomas.mr_simul.synthetic import GaussianModel
+import nibabel as nb
+import sys
+
+
+# Function to check if file exists
+def is_valid_file(parser, arg):
+    if not os.path.exists(arg):
+        parser.error("Cannot open file %s." % arg)
+    else:
+        return open(arg, 'r')
+
+
+# The command-line arguments parser.
+####################################
+description = ("Simulates diffusion-weighted images from the description "
+               "of a phantom.")
+
+parser = argparse.ArgumentParser(description=description)
+parser.add_argument('-b', dest='bvals', required=True,
+                    help="b-values in a text file.")
+parser.add_argument('-r', dest='bvecs', required=True,
+                    help="b-vectors in a text file.")
+parser.add_argument('--output_dir', default="./",
+                    help="Output directory. (%(default)s)")
+parser.add_argument('--output', dest='output', required=False,
+                    default="dwis.nii.gz",
+                    help="Output dwis file name. (%(default)s)")
+parser.add_argument('--out_mask', dest='mskfile', required=False,
+                    default="mask.nii.gz",
+                    help="Output mask file name. (%(default)s)")
+
+
+parser.add_argument('--tissue_vf', dest='tissue_vf_fname', required=True,
+                    nargs='+', help="input csf volume fraction map")
+parser.add_argument('--sticks_dir', dest='dirs', required=True, nargs='+',
+                    help='directions of fibers to be simulated')
+parser.add_argument(
+    '--sticks_vfs', dest='sticks_vfs', required=True, nargs='+',
+    help='volume fractions of fibers to be simulated')
+
+parser.add_argument(
+    '--res', type=float, default=2.0,
+    help="Diffusion-weighted images resolution in mm. (%(default)s)")
+parser.add_argument(
+    '--fov', type=float, default=None,
+    help="Field of view in mm. If None, adapts to the size of the phantom.")
+
+parser.add_argument(
+    '--snr', type=float, default=100.,
+    help="Signal-to-noise ratio of the simulated images. "
+    "0.0 for noise-free images. (%(default)s)")
+parser.add_argument('--seed', type=int, default=None,
+                    help="Seed for the random number generator. (%(default)s)")
+parser.add_argument(
+    '--lambda1', type=float, default=1.7e-3,
+    help="Lambda 1 parameter of the fiber tensor. (%(default)s)")
+parser.add_argument(
+    '--lambda2', type=float, default=0.2e-3,
+    help="Lambda 2 and 3 parameters of the fiber tensor. (%(default)s)")
+parser.add_argument(
+    '--diff_iso', type=float, default=[7.e-4, 9.e-4, 2.e-4, 3.e-3, 1.e-3],
+    nargs=5, help=('Diffusion of isotropic compartments in 5TT format: '
+                   '[cGM, dGM, WM, CSF, pathology] (%(default)s)'))
+
+parser.add_argument(
+    '--out_type', default='int16', choices=['float', 'int16', 'uint8'],
+    help='output file type')
+
+parser.add_argument(
+    '--order_sh', type=int, default=8, metavar='ORDER',
+    help="Spherical harmonics truncation order for the FOD. (%(default)s)")
+parser.add_argument(
+    '--export_fod', default=None, choices=['dipy', 'mrtrix'], metavar='BASIS',
+    help=("Either 'dipy' or 'mrtrix': sets the convention of the exported "
+          "FODs."))
+
+args = parser.parse_args()
+
+print "\tReading volume fractions of tissues."
+vfs_im = [nb.load(f) for f in args.tissue_vf_fname]
+ts_vfs = np.nan_to_num(nb.concat_images(vfs_im).get_data())
+
+# These will be used along the process
+affine = vfs_im[0].get_affine()
+image_shape = vfs_im[0].get_shape()
+
+print "\tReading volume fractions of fibers."
+sf_img = [nb.load(f) for f in args.sticks_vfs]
+affine = sf_img[0].get_affine()
+sf_vfs = np.nan_to_num(nb.concat_images(sf_img).get_data())
+
+print "\tReading directions of fibers."
+nsf = len(args.dirs)
+sticks = np.nan_to_num(nb.load(args.dirs[0]).get_data())[..., np.newaxis]
+
+for i in range(1, nsf):
+    stdata = np.nan_to_num(nb.load(args.dirs[i]).get_data())
+    sticks = np.concatenate((sticks, stdata[..., np.newaxis]), axis=4)
+
+print "\tNormalizing fractions to sum up 1.0..."
+total_vf = np.sum(ts_vfs, axis=3) + np.sum(sf_vfs, axis=3)
+ts_vfs[total_vf > 0] /= total_vf[total_vf > 0, np.newaxis]
+sf_vfs[total_vf > 0] /= total_vf[total_vf > 0, np.newaxis]
+total_vf = np.sum(ts_vfs, axis=3) + np.sum(sf_vfs, axis=3)
+
+background_vf = np.ones_like(total_vf) - total_vf
+
+gm_vf = ts_vfs[..., 0]
+dgm_vf = ts_vfs[..., 1]
+csf_vf = ts_vfs[..., 3]
+wm_vf = ts_vfs[..., 2] + np.sum(sf_vfs, axis=3)
+
+outmsk = np.zeros_like(total_vf, dtype=np.uint8)
+outmsk[total_vf > 0.0] = 1
+nb.Nifti1Image(outmsk, affine, None).to_filename(args.mskfile)
+
+print "\tWriting fractions that will be simulated..."
+
+for i in range(nsf):
+    nb.Nifti1Image(sf_vfs[..., i], affine).to_filename("vf_sf%02d.nii.gz" % i)
+
+for i in range(len(vfs_im)):
+    nb.Nifti1Image(ts_vfs[..., i], affine).to_filename("vf_iso%02d.nii.gz" % i)
+
+print "\tReading acquisition sequence..."
+bvals = np.loadtxt(args.bvals)
+bvecs = np.loadtxt(args.bvecs)
+nb_acquisitions = bvals.shape[0]
+if bvecs.shape[1] != 3:
+    if bvecs.shape[0] != 3:
+        sys.stderr.write("The .bvec file should contain 3d vectors.")
+        sys.exit(1)
+    bvecs = bvecs.T
+indices_dwis = (bvals > 0)
+gradient_directions = bvecs[indices_dwis]
+gradient_bvals = bvals[indices_dwis]
+np.clip(gradient_directions, -1, 1, gradient_directions)
+
+print "Preparing diffusion-weighted images..."
+###############################################
+
+
+print "\tPreparing relaxation time fields for each tissue."
+# First initialize the random number generator - if seed provided
+rng = np.random.RandomState(args.seed)
+dim_x, dim_y, dim_z = image_shape
+wm_t1, wm_t2 = relaxation_time_images(image_shape, 'wm', rng=rng)
+gm_t1, gm_t2 = relaxation_time_images(image_shape, 'gm', rng=rng)
+csf_t1, csf_t2 = relaxation_time_images(image_shape, 'csf', rng=rng)
+
+
+print "\tComputing fiber orientation distribution."
+wm_mask = sf_vfs.sum(axis=3)
+order_sh = args.order_sh
+dim_sh = shm.dimension(order_sh)
+fods = np.zeros((dim_x, dim_y, dim_z, dim_sh))
+wm_indices = np.nonzero(wm_mask)
+
+for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
+    fod_samples = sticks[i, j, k, ...].T
+    fod_weights = sf_vfs[i, j, k]
+    fods[i, j, k] = compute_fod(fod_samples, fod_weights,
+                                kappa=50, sh=True, order_sh=order_sh)
+
+
+if args.export_fod is not None:
+    print "Exporting fods following %s's convention." % args.export_fod
+    if args.export_fod == "dipy":
+        fods_img = nb.Nifti1Image(fods * wm_vf[..., np.newaxis], affine)
+    elif args.export_fod == "mrtrix":
+        conversion_matrix = shm.convert_to_mrtrix(order_sh)
+        fods_img = nb.Nifti1Image(
+            np.dot(fods, conversion_matrix.T) * wm_vf[..., np.newaxis], affine)
+    nb.save(fods_img, "fods.nii.gz")
+
+
+print "\tCompute diffusion signal attenuation of isotropic compartments."
+wm_freediff = args.diff_iso[2]
+wm_att_free = ts_vfs[..., 2, np.newaxis] \
+    * np.exp(-bvals * wm_freediff)[np.newaxis, np.newaxis, np.newaxis, :]
+
+gm_diffusivity = args.diff_iso[0]
+gm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
+    * np.exp(-bvals * gm_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
+
+dgm_diffusivity = args.diff_iso[0]
+dgm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
+    * np.exp(-bvals * dgm_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
+
+csf_diffusivity = args.diff_iso[3]
+csf_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
+    * np.exp(-bvals * csf_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
+
+
+print "\tPrepare synthetic model of diffusion and convolution with FOD."
+lambda1 = args.lambda1
+lambda2 = args.lambda2
+model = GaussianModel(lambda1, lambda2)
+signal_operators = {}
+tau = 50e-3  # diffusion time: 50ms
+unique_bvals = set(bvals[indices_dwis].tolist())
+gradient_theta = np.arccos(gradient_directions[:, 2])
+gradient_phi = np.arctan2(gradient_directions[:, 1], gradient_directions[:, 0])
+H = shm.matrix(gradient_theta, gradient_phi, order=order_sh)
+for bval in unique_bvals:
+    qnorm = np.sqrt(bval / (4 * np.pi ** 2 * tau))
+    rs = model.signal_convolution_sh(order_sh, qnorm, tau)
+    indices = (gradient_bvals == bval)
+    H[indices] *= rs[np.newaxis, :]
+
+wm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions))
+wm_attenuation[..., indices_dwis] = np.dot(fods, H.T)
+
+wm_attenuation_img = nb.Nifti1Image(wm_attenuation, affine)
+nb.save(wm_attenuation_img, "wm_attenuation.nii.gz")
+
+
+print "\tCompute diffusion-weighted images"
+te, tr = 0.09, 5.0
+b0_wm = mr_signal(wm_vf, wm_t1, wm_t2,
+                  0 * gm_vf, gm_t1, gm_t2,
+                  0 * csf_vf, csf_t1, csf_t2,
+                  te, tr)
+b0_gm = mr_signal(0 * wm_vf, wm_t1, wm_t2,
+                  gm_vf, gm_t1, gm_t2,
+                  0 * csf_vf, csf_t1, csf_t2,
+                  te, tr)
+b0_dgm = mr_signal(0 * wm_vf, wm_t1, wm_t2,
+                   dgm_vf, gm_t1, gm_t2,
+                   0 * csf_vf, csf_t1, csf_t2,
+                   te, tr)
+b0_csf = mr_signal(0 * wm_vf, wm_t1, wm_t2,
+                   0 * gm_vf, gm_t1, gm_t2,
+                   csf_vf, csf_t1, csf_t2,
+                   te, tr)
+dwis = b0_wm[..., np.newaxis] * wm_attenuation \
+    + b0_gm[..., np.newaxis] * gm_attenuation \
+    + b0_dgm[..., np.newaxis] * dgm_attenuation \
+    + b0_csf[..., np.newaxis] * csf_attenuation \
+    + b0_wm[..., np.newaxis] * wm_att_free
+
+print "\tCorrupt images by Rician noise"
+if args.snr > 0.:
+    wm_mean_t1, wm_mean_t2, wm_rho = get_tissue_physical_parameters('wm')
+    s0 = wm_rho * (1.0 - np.exp(-tr / wm_mean_t1)) * np.exp(-te / wm_mean_t2)
+    sigma = s0 / args.snr
+    dwis = rician_noise(dwis, sigma, rng=rng)
+
+out_dtype = np.float32
+scale = 2000
+
+if args.out_type != 'float':
+    print "\tChange image type to %s" % args.out_type
+    if args.out_type == 'uint8':
+        out_dtype = np.uint8
+        if np.any(dwis < 0.0):
+            dwis -= dwis.min()
+    elif args.out_type == 'int16':
+        out_dtype = np.int16
+    else:
+        raise NotImplementedError('Only float, uint8 and int16 are allowed')
+
+    scale = np.iinfo(out_dtype).max / dwis.max()
+
+dwis = np.asarray(scale * dwis)
+
+print "\tWrite images to disk"
+hdr = nb.Nifti1Header()
+hdr.set_data_shape(dwis.shape)
+hdr.set_data_dtype(out_dtype)
+hdr.set_xyzt_units('mm', 'sec')
+nb.Nifti1Image(dwis.astype(out_dtype), affine, hdr).to_filename(
+    os.path.join(args.output_dir, args.output))
