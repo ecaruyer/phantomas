@@ -6,11 +6,8 @@ import sys
 
 def main():
     from glob import glob
-    from setuptools import setup, find_packages
+    from setuptools import setup, find_packages, Extension
     from setuptools.extension import Extension
-
-    from Cython.Distutils import build_ext
-    from Cython.Build import cythonize
     import numpy as np
 
     REQ_LINKS = []
@@ -40,13 +37,13 @@ def main():
           author='Emmanuel Caruyer',
           author_email='caruyer@gmail.com',
           url='http://www.emmanuelcaruyer.com/phantomas/',
+          setup_requires=['setuptools>=18.0', 'numpy', 'cython'],
           install_requires=REQUIREMENTS,
           dependency_links=REQ_LINKS,
           packages=find_packages(),
           package_data={'phantomas.mr_simul': ["spherical_21_design.txt"]},
           scripts=glob('scripts/*'),
-          # cmdclass={'build_ext': build_ext},
-          ext_modules=cythonize(extensions),
+          ext_modules=extensions,
     )
 
 if __name__ == '__main__':
