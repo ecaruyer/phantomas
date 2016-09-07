@@ -25,13 +25,13 @@ def main():
     if REQUIREMENTS is None:
         REQUIREMENTS = []
 
-    extensions = [
-        Extension("phantomas.mr_simul.fast_volume_fraction",
-                  ["phantomas/mr_simul/fast_volume_fraction.pyx",
-                   "phantomas/mr_simul/c_fast_volume_fraction.c"],
-                  include_dirs=[np.get_include(), "/usr/local/include/"],
-                  library_dirs=["/usr/lib/"],
-                  libraries=["gsl", "gslcblas"]),
+    extensions = [Extension(
+            "phantomas.mr_simul.fast_volume_fraction",
+            ["phantomas/mr_simul/fast_volume_fraction.pyx",
+            "phantomas/mr_simul/c_fast_volume_fraction.c"],
+            include_dirs=[np.get_include(), "/usr/local/include/"],
+            library_dirs=["/usr/lib/"],
+            libraries=["gsl", "gslcblas"]),
     ]
 
     setup(name='phantomas',
@@ -40,12 +40,14 @@ def main():
           author='Emmanuel Caruyer',
           author_email='caruyer@gmail.com',
           url='http://www.emmanuelcaruyer.com/phantomas/',
+          install_requires=REQUIREMENTS,
+          dependency_links=REQ_LINKS,
           packages=find_packages(),
           package_data={'phantomas.mr_simul': ["spherical_21_design.txt"]},
           scripts=glob('scripts/*'),
           # cmdclass={'build_ext': build_ext},
           ext_modules=cythonize(extensions),
-          )
+    )
 
 if __name__ == '__main__':
     LOCAL_PATH = os.path.dirname(os.path.abspath(sys.argv[0]))
