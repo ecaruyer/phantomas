@@ -34,7 +34,7 @@ def main():
                   libraries=["gsl", "gslcblas"]),
     ]
 
-    setup(name='Phantomas',
+    setup(name='phantomas',
           description='A software phantom generation tool for diffusion MRI.',
           version='0.1.dev',
           author='Emmanuel Caruyer',
