@@ -57,7 +57,7 @@ SETUP_REQUIRES = [
     'cython',
 ]
 
-# Dependencies to be fethed from urls (e.g. github repos)
+# Dependencies to be fetched from urls (e.g. github repos)
 LINKS_REQUIRES = []
 
 # Dependencies to install for testing (e.g. nose or pytest)
