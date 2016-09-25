@@ -40,6 +40,7 @@ CLASSIFIERS = [
 DOWNLOAD_URL = 'https://github.com/ecaruyer/phantomas'
 URL = 'http://www.emmanuelcaruyer.com/{}'.format(__packagename__)
 
+# Dependencies of phantomas
 REQUIRES = [
     'cython',
     'nibabel',
@@ -49,23 +50,26 @@ REQUIRES = [
     'wsgiref',
 ]
 
+# Required before running setup()
 SETUP_REQUIRES = [
     'setuptools>=18.0',
     'numpy',
     'cython',
 ]
 
-LINKS_REQUIRES = [
-    'git+https://github.com/oesteban/phantomas.git#egg=phantomas',
-    'git+https://github.com/oesteban/nipype.git#egg=nipype',
-]
+# Dependencies to be fethed from urls (e.g. github repos)
+LINKS_REQUIRES = []
 
+# Dependencies to install for testing (e.g. nose or pytest)
 TESTS_REQUIRES = []
 
+# Dependencies to install for extra features
+# For now, only documentation is enabled. Install with pip install -e .[doc]
 EXTRA_REQUIRES = {
     'doc': ['sphinx'],
     # 'tests': TESTS_REQUIRES,
 }
 
 # Enable a handle to install all extra dependencies at once
+# with pip install -e .[all]
 EXTRA_REQUIRES['all'] = [val for _, val in list(EXTRA_REQUIRES.items())]
