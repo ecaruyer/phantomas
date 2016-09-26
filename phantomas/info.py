@@ -54,7 +54,7 @@ REQUIRES = [
 SETUP_REQUIRES = [
     'setuptools>=18.0',
     'numpy',
-    'cython'
+    'cython',
     'scikit-sparse',
 ]
 
