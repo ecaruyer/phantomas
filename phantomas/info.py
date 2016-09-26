@@ -68,6 +68,7 @@ TESTS_REQUIRES = []
 # For now, only documentation is enabled. Install with pip install -e .[doc]
 EXTRA_REQUIRES = {
     'doc': ['sphinx'],
+    'viz': ['matplotlib', 'mayavi'], # mayavi to provide vtk
     # 'tests': TESTS_REQUIRES,
 }
 
