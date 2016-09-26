@@ -12,7 +12,10 @@ References
 """
 import numpy as np
 import scipy.sparse as scisp
-from scikits.sparse.cholmod import cholesky
+try:
+    from scikits.sparse.cholmod import cholesky
+except ImportError:
+    from sksparse.cholmod import cholesky
 
 
 def _random_correlated_image(mean, sigma, image_shape, alpha=0.3, rng=None):
@@ -109,8 +112,8 @@ def get_tissue_physical_parameters(tissue_type):
         proton density
 
     """
-    return (_physical_parameters[tissue_type]['t1']['mean'], 
-            _physical_parameters[tissue_type]['t2']['mean'], 
+    return (_physical_parameters[tissue_type]['t1']['mean'],
+            _physical_parameters[tissue_type]['t2']['mean'],
             _physical_parameters[tissue_type]['rho'])
 
 def relaxation_time_images(image_shape, tissue_type, rng=None):
