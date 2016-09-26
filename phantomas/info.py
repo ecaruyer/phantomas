@@ -45,7 +45,7 @@ REQUIRES = [
     'cython',
     'nibabel',
     'numpy',
-    'scikits.sparse',
+    'scikit-sparse',
     'scipy',
     'wsgiref',
 ]
@@ -54,7 +54,8 @@ REQUIRES = [
 SETUP_REQUIRES = [
     'setuptools>=18.0',
     'numpy',
-    'cython',
+    'cython'
+    'scikit-sparse',
 ]
 
 # Dependencies to be fetched from urls (e.g. github repos)
