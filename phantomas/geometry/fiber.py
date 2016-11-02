@@ -5,7 +5,10 @@ cortical areas. Currently, the only supported shape for the "cortical surface"
 is a sphere.
 """
 import numpy as np
-from scipy.interpolate import PiecewisePolynomial
+try:
+    from scipy.interpolate import PiecewisePolynomial
+except ImportError:
+    from scipy.interpolate import PPoly as PiecewisePolynomial
 
 
 class FiberSource:
