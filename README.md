@@ -25,8 +25,8 @@ Optionally, you may also need:
 
 Dependencies can be satisfied by running `pip install -r requirements.txt`
 
-On ubuntu 14.04, installation of scikits-parse by pip
-(`pip install scikits.parse`) failed with the following line:
+On ubuntu 14.04, installation of scikits-sparse by pip
+(`pip install scikits.sparse`) failed with the following line:
 `scikits/sparse/cholmod.c:245:33: fatal error: suitesparse/cholmod.h: No such file or directory`
 The issue was solved installing the package 'libsuitesparse-dev':
 `apt-get install libsuitesparse-dev`
