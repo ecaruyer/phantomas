@@ -5,10 +5,7 @@ cortical areas. Currently, the only supported shape for the "cortical surface"
 is a sphere.
 """
 import numpy as np
-try:
-    from scipy.interpolate import PiecewisePolynomial
-except ImportError:
-    from scipy.interpolate import PPoly as PiecewisePolynomial
+from scipy.interpolate import BPoly
 
 
 class FiberSource:
@@ -90,11 +87,11 @@ class FiberSource:
         derivatives = (derivatives.T / np.sqrt((derivatives ** 2).sum(1))).T \
                     * length
                
-        self.x_poly = PiecewisePolynomial(ts, 
+        self.x_poly = BPoly.from_derivatives(ts, 
                scale * np.vstack((control_points[:, 0], derivatives[:, 0])).T)
-        self.y_poly = PiecewisePolynomial(ts, 
+        self.y_poly = BPoly.from_derivatives(ts, 
                scale * np.vstack((control_points[:, 1], derivatives[:, 1])).T)
-        self.z_poly = PiecewisePolynomial(ts, 
+        self.z_poly = BPoly.from_derivatives(ts, 
                scale * np.vstack((control_points[:, 2], derivatives[:, 2])).T)
 
 
@@ -136,9 +133,9 @@ class FiberSource:
         tangents : array-like, shape (N, 3)
             The tangents (as unit vectors) to the fiber at selected timesteps.
         """
-        x_der = self.x_poly.derivative(ts, der=1)
-        y_der = self.y_poly.derivative(ts, der=1)
-        z_der = self.z_poly.derivative(ts, der=1)
+        x_der = self.x_poly.derivative()(ts)
+        y_der = self.y_poly.derivative()(ts)
+        z_der = self.z_poly.derivative()(ts)
         N = ts.shape[0]
         tangents = np.zeros((N, 3))
         tangents[:, 0] = x_der
