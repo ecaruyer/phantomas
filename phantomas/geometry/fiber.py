@@ -163,12 +163,12 @@ class FiberSource:
         curvatures : array-like, shape (N, )
             The curvatures of the fiber trajectory, at selected timesteps.
         """
-        x_der1 = self.x_poly.derivative(ts, der=1)
-        x_der2 = self.x_poly.derivative(ts, der=2)
-        y_der1 = self.y_poly.derivative(ts, der=1)
-        y_der2 = self.y_poly.derivative(ts, der=2)
-        z_der1 = self.z_poly.derivative(ts, der=1)
-        z_der2 = self.z_poly.derivative(ts, der=2)
+        x_der1 = self.x_poly.derivative(1)(ts)
+        x_der2 = self.x_poly.derivative(2)(ts)
+        y_der1 = self.y_poly.derivative(1)(ts)
+        y_der2 = self.y_poly.derivative(2)(ts)
+        z_der1 = self.z_poly.derivative(1)(ts)
+        z_der2 = self.z_poly.derivative(2)(ts)
         curv  = (z_der2*y_der1 - y_der2*z_der1)**2
         curv += (x_der2*z_der1 - z_der2*x_der1)**2
         curv += (y_der2*x_der1 - x_der2*y_der1)**2
