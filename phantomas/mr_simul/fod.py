@@ -9,9 +9,9 @@ import os
 from ..utils import shm
 
 
-def compute_directions(fibers, tangents, fiber_radii, voxel_center, voxel_size, 
+def compute_directions(fibers, tangents, fiber_radii, voxel_center, voxel_size,
                        resolution):
-    """Given a set of fibers, and a voxel size, compute the set of 
+    """Given a set of fibers, and a voxel size, compute the set of
     orientations on a subgrid with associated weights.
 
     Parameters
@@ -35,7 +35,7 @@ def compute_directions(fibers, tangents, fiber_radii, voxel_center, voxel_size,
         A sequence of diffusion directions, corresponding to local directions
         of fibers on the grid subdivision.
     fod_weights : array-like, shape (P, )
-        A sequence of weights, corresponding to the volume fraction (relative 
+        A sequence of weights, corresponding to the volume fraction (relative
         to the voxel) of each diffusion direction.
 
     """
@@ -50,11 +50,11 @@ def compute_directions(fibers, tangents, fiber_radii, voxel_center, voxel_size,
     total_nb_fibers = np.zeros(dim_grid)
     compartments = np.zeros((nb_fibers, dim_grid), dtype=np.bool)
     directions = np.zeros((nb_fibers, dim_grid, 3), dtype=np.double)
-    for i, fiber, tangent, fiber_radius in zip(range(nb_fibers), fibers, 
-                                               tangents, fiber_radii): 
+    for i, fiber, tangent, fiber_radius in zip(range(nb_fibers), fibers,
+                                               tangents, fiber_radii):
         fiber_indices = in_fiber(center_positions,
-                           fiber.copy("C"), 
-                           tangent.copy("C"), 
+                           fiber.copy("C"),
+                           tangent.copy("C"),
                            fiber_radius)
         compartments[i] = fiber_indices > -1
         directions[i, fiber_indices > -1] = \
@@ -65,26 +65,26 @@ def compute_directions(fibers, tangents, fiber_radii, voxel_center, voxel_size,
         fod_samples = np.vstack((fod_samples, directions[i, compartments[i]]))
         fod_weights = np.hstack(
           (fod_weights, 1.0 / np.sum(compartments, 0)[compartments[i]]))
-    
+
     return fod_samples, fod_weights / dim_grid
 
 
-def compute_fod(fod_samples, fod_weights, dirs=None, kappa=30, sh=False, 
+def compute_fod(fod_samples, fod_weights, dirs=None, kappa=30, sh=False,
                 order_sh=8):
     """
-    Computes fod from a discrete set of weighted samples, using kernel density 
+    Computes fod from a discrete set of weighted samples, using kernel density
     estimation with a symmetric Von Mises-Fisher kernel.
 
     Parameters
     ----------
     fod_samples : array-like shape (P, 3)
-        A discrete set of directions, as obtained by 
+        A discrete set of directions, as obtained by
         :func:`compute_directions`.
     fod_weights : array-like shape (P, )
-        The volume fractions associated to the directions, as obtained by 
+        The volume fractions associated to the directions, as obtained by
         :func:`compute_directions`.
     dirs : array-like shape (M, 3)
-        The directions on which to evaluate the fod. If None, uses a default 
+        The directions on which to evaluate the fod. If None, uses a default
         spherical 21-design (described in file ``spherical_21_design.txt``).
     kappa : double
         The concentration factor of the Von Mises-Fischer distribution.
@@ -100,7 +100,7 @@ def compute_fod(fod_samples, fod_weights, dirs=None, kappa=30, sh=False,
     """
     if dirs == None:
         __location__ = os.path.dirname(__file__)
-        dirs = np.loadtxt(os.path.join(__location__, 
+        dirs = np.loadtxt(os.path.join(__location__,
                           "./spherical_21_design.txt"))
     nb_samples = fod_samples.shape[0]
     nb_dirs = dirs.shape[0]
@@ -145,13 +145,13 @@ def c_vmf(kappa):
 
 def x_l(kappa, l):
     """
-    Computes the l-th degree SH coefficient of the projection of the 
+    Computes the l-th degree SH coefficient of the projection of the
     symmetric Von-Mises Fischer kernel (centered at z-axis).
 
     Parameters
     ----------
     kappa : float
-        The concentration parameter of the symmetric Von-Mises Fischer 
+        The concentration parameter of the symmetric Von-Mises Fischer
         distribution.
     l : int
         The degree of the SH coefficient to be computed.
@@ -167,17 +167,17 @@ def x_l(kappa, l):
 
 def compute_fod_sh(fod_samples, fod_weights, kappa=30, order_sh=8):
     """
-    Computes fod using pure spherical harmonics from a discrete set of 
-    weighted directions, using kernel density estimation with a symmetric Von 
+    Computes fod using pure spherical harmonics from a discrete set of
+    weighted directions, using kernel density estimation with a symmetric Von
     Mises-Fisher kernel.
 
     Parameters
     ----------
     fod_samples : array-like shape (P, 3)
-        A discrete set of directions, as obtained by 
+        A discrete set of directions, as obtained by
         :func:`compute_directions`.
     fod_weights : array-like shape (P, )
-        The volume fractions associated to the directions, as obtained by 
+        The volume fractions associated to the directions, as obtained by
         :func:`compute_directions`.
     kappa : double
         The concentration factor of the Von Mises-Fischer distribution.
@@ -200,5 +200,4 @@ def compute_fod_sh(fod_samples, fod_weights, kappa=30, order_sh=8):
         coeff_vmf = x_l(kappa, l) * np.sqrt(4*np.pi / (2*l + 1))
         H[:, shm.dimension(l-2):shm.dimension(l)] *= coeff_vmf
     H *= fod_weights[:, np.newaxis]
-    print H.shape
     return H.sum(0)
