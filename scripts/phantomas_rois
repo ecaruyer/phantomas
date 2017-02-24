@@ -9,35 +9,35 @@ from phantomas.geometry.fiber import FiberSource
 from phantomas.geometry.models import Fiber
 from phantomas.geometry.rois import target_rois
 from phantomas.mr_simul.partial_volume \
-   import compute_affine_matrix
+    import compute_affine_matrix
 
 
 # Function to check if file exists
 def is_valid_file(parser, arg):
     if not os.path.exists(arg):
-       parser.error("Cannot open file %s." % arg)
+        parser.error("Cannot open file %s." % arg)
     else:
-       return open(arg, 'r')
+        return open(arg, 'r')
 
 
 # The command-line arguments parser.
 ####################################
-description="Prepare regions of interest for connectivity analysis."
+description = "Prepare regions of interest for connectivity analysis."
 
 parser = argparse.ArgumentParser(description=description)
 parser.add_argument('geometry',
-                    type=lambda x: is_valid_file(parser,x),
+                    type=lambda x: is_valid_file(parser, x),
                     help="A JSON-formatted file describing fiber and phantom "
                          "geometries.")
 parser.add_argument('--res', type=float, default=2.0,
-    help="Diffusion-weighted images resolution in mm.")
+                    help="Diffusion-weighted images resolution in mm.")
 parser.add_argument('--fov', type=float, default=None,
                     help="Field of view in mm. If None, adapts to the size "
                          "of the phantom.")
 args = parser.parse_args()
 
 
-print "Reading geometry description..."
+print("Reading geometry description...")
 #######################################
 geometry = json.load(args.geometry)
 
@@ -59,16 +59,16 @@ for fiber_name, fiber_params in fibers_dict.items():
 
 # Read other phantom parameters
 phantom_radius = geometry.get("phantom_radius", None)
-if phantom_radius == None:
+if phantom_radius is None:
     fiber = fibers[0].get_points()
     phantom_radius = np.linalg.norm(fiber[0])
 
 phantom_fov = args.fov
-if phantom_fov == None:
+if phantom_fov is None:
     phantom_fov = 2.2 * phantom_radius
 
 
-print "Preparing rois for connectivity..."
+print("Preparing rois for connectivity...")
 ##########################################
 affine = compute_affine_matrix(args.res, phantom_fov)
 target_rois, connectivity_matrix = target_rois(fibers, args.res, phantom_fov)
