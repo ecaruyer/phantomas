@@ -1,0 +1,7 @@
+cython
+numpy
+argparse
+scipy
+nibabel
+scikit-sparse
+wsgiref
