@@ -34,6 +34,8 @@ parser.add_argument('--res', type=float, default=2.0,
 parser.add_argument('--fov', type=float, default=None,
                     help="Field of view in mm. If None, adapts to the size "
                          "of the phantom.")
+parser.add_argument('-o', default='.', dest="out_dir",
+                    help="Output directory for the masks.")
 args = parser.parse_args()
 
 
@@ -73,5 +75,5 @@ print("Preparing rois for connectivity...")
 affine = compute_affine_matrix(args.res, phantom_fov)
 target_rois, connectivity_matrix = target_rois(fibers, args.res, phantom_fov)
 target_rois_img = nib.Nifti1Image(target_rois, affine)
-nib.save(target_rois_img, "target_rois.nii.gz")
-np.savetxt("connectivity_matrix.txt", connectivity_matrix, fmt="%1d")
+nib.save(target_rois_img, os.path.join(args.out_dir, "target_rois.nii.gz"))
+np.savetxt(os.path.join(args.out_dir, "connectivity_matrix.txt"), connectivity_matrix, fmt="%1d")
