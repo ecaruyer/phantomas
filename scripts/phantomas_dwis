@@ -77,7 +77,7 @@ parser.add_argument('--export_vf',  action='store_true', required=False,
 args = parser.parse_args()
 
 
-print "Reading geometry description..."
+print("Reading geometry description...")
 #######################################
 geometry = json.load(args.geometry)
 
@@ -101,7 +101,7 @@ for fiber_name, fiber_params in fibers_dict.items():
     fiber_trajectories.append(f(ts))
     fiber_tangents.append(f.tangents(ts))
     fiber_radii.append(radius)
-print "Found %d fibers." % len(fibers)
+print("Found %d fibers." % len(fibers))
 
 # Read Isotropic regions
 regions_dict = geometry.get("isotropic_regions", {})
@@ -112,7 +112,7 @@ for region_name, region_params in regions_dict.items():
     region_centers.append(center)
     radius = region_params["radius"]
     region_radii.append(radius)
-print "Found %d regions." % len(region_centers)
+print("Found %d regions." % len(region_centers))
 
 # Read other phantom parameters
 phantom_radius = geometry.get("phantom_radius", None)
@@ -125,7 +125,7 @@ if phantom_fov == None:
     phantom_fov = 2.2 * phantom_radius
 
 
-print "\tReading acquisition sequence..."
+print("\tReading acquisition sequence...")
 bvals = np.loadtxt(args.bvals)
 bvecs = np.loadtxt(args.bvecs)
 nb_acquisitions = bvals.shape[0]
@@ -139,10 +139,10 @@ gradient_directions = bvecs[indices_dwis]
 gradient_bvals = bvals[indices_dwis]
 np.clip(gradient_directions, -1, 1, gradient_directions)
 
-print "Preparing diffusion-weighted images..."
+print("Preparing diffusion-weighted images...")
 ###############################################
 
-print "\tComputing mask for each structure."
+print("\tComputing mask for each structure.")
 affine = compute_affine_matrix(args.res, phantom_fov)
 phantom_center = np.array([0., 0., 0.])
 region_masks = compute_spherical_region_masks(region_centers, region_radii,
@@ -153,7 +153,7 @@ gm_mask = compute_spherical_region_masks([phantom_center],
                                          phantom_fov)[..., 0]
 
 
-print "\tComputing volume fraction for each tissue type."
+print("\tComputing volume fraction for each tissue type.")
 background_vf, gm_vf, wm_vf, csf_vf = \
     compute_volume_fractions(np.asarray([0, 0, 0,]), phantom_radius, gm_mask,
                              fibers, fiber_masks,
@@ -161,7 +161,7 @@ background_vf, gm_vf, wm_vf, csf_vf = \
                              args.res, phantom_fov)
 
 if args.export_vf:
-    print "Exporting volume fraction."
+    print("Exporting volume fraction.")
 
     gm_vf_img = nib.Nifti1Image(gm_vf, affine)
     nib.save(gm_vf_img, os.path.join(args.output_dir, "gm_vf.nii.gz"))
@@ -173,7 +173,7 @@ if args.export_vf:
     nib.save(csf_vf_img, os.path.join(args.output_dir, "csf_vf.nii.gz"))
 
 
-print "\tPreparing relaxation time fields for each tissue."
+print("\tPreparing relaxation time fields for each tissue.")
 # First initialize the random number generator - if seed provided
 rng = np.random.RandomState(args.seed)
 image_shape = gm_mask.shape
@@ -183,7 +183,7 @@ gm_t1, gm_t2 = relaxation_time_images(image_shape, 'gm', rng=rng)
 csf_t1, csf_t2 = relaxation_time_images(image_shape, 'csf', rng=rng)
 
 
-print "\tComputing fiber orientation distribution."
+print("\tComputing fiber orientation distribution.")
 order_sh = args.order_sh
 dim_sh = shm.dimension(order_sh)
 fods = np.zeros((dim_x, dim_y, dim_z, dim_sh))
@@ -204,7 +204,7 @@ for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
 
 
 if args.export_fod is not None:
-    print "Exporting fods following %s's convention." % args.export_fod
+    print("Exporting fods following %s's convention." % args.export_fod)
     if args.export_fod == "dipy":
         fods_img = nib.Nifti1Image(fods * wm_vf[..., np.newaxis], affine)
     elif args.export_fod == "mrtrix":
@@ -214,7 +214,7 @@ if args.export_fod is not None:
     nib.save(fods_img, os.path.join(args.output_dir, "fods.nii.gz"))
 
 
-print "\tPrepare synthetic model of diffusion and convolution with FOD."
+print("\tPrepare synthetic model of diffusion and convolution with FOD.")
 lambda1 = args.lambda1
 lambda2 = args.lambda2
 model = GaussianModel(lambda1, lambda2)
@@ -231,7 +231,7 @@ for bval in unique_bvals:
     H[indices] *= rs[np.newaxis, :]
 
 
-print "\tCompute diffusion signal attenuation."
+print("\tCompute diffusion signal attenuation.")
 wm_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions))
 wm_attenuation[..., indices_dwis] = np.dot(fods, H.T)
 
@@ -247,7 +247,7 @@ csf_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
     * np.exp(-bvals * csf_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
 
 
-print "\tCompute diffusion-weighted images"
+print("\tCompute diffusion-weighted images")
 te, tr = 0.09, 5.0
 b0_wm = mr_signal(wm_vf, wm_t1, wm_t2,
                   0 * gm_vf, gm_t1, gm_t2,
@@ -265,17 +265,17 @@ dwis = b0_wm[..., np.newaxis] * wm_attenuation \
      + b0_gm[..., np.newaxis] * gm_attenuation \
      + b0_csf[..., np.newaxis] * csf_attenuation
 
-print "\tCorrupt images by Rician noise"
+print("\tCorrupt images by Rician noise")
 if args.snr > 0.:
     wm_mean_t1, wm_mean_t2, wm_rho = get_tissue_physical_parameters('wm')  
     s0 = wm_rho * (1.0 - np.exp(-tr / wm_mean_t1)) * np.exp(-te / wm_mean_t2)    
     sigma = s0 / args.snr
     dwis = rician_noise(dwis, sigma, rng=rng)
 
-print "\tChange image type to INT16"
+print("\tChange image type to INT16")
 scale = 2 ** 14
 dwis = np.asarray(scale * dwis, dtype=np.int16)
 
-print "\tWrite images to disk"
+print("\tWrite images to disk")
 dwis_img = nib.Nifti1Image(dwis, affine)
 nib.save(dwis_img, os.path.join(args.output_dir, args.output))

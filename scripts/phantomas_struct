@@ -50,7 +50,7 @@ parser.add_argument('--seed', type=int, default=None,
 args = parser.parse_args()
 
 
-print "Reading geometry description..."
+print("Reading geometry description...")
 #######################################
 geometry = json.load(args.geometry)
 
@@ -78,7 +78,7 @@ for region_name, region_params in regions_dict.items():
     region_centers.append(center)
     radius = region_params["radius"]
     region_radii.append(radius)
-print "Found %d regions." % len(region_centers)
+print("Found %d regions." % len(region_centers))
 
 # Read other phantom parameters
 phantom_radius = geometry.get("phantom_radius", None)
@@ -91,9 +91,9 @@ if phantom_fov == None:
     phantom_fov = 2.2 * phantom_radius
 
 
-print "Preparing T1- and T2-weighted images..."
+print("Preparing T1- and T2-weighted images...")
 ###############################################
-print "\tComputing mask for each structure."
+print("\tComputing mask for each structure.")
 affine = compute_affine_matrix(args.res, phantom_fov)
 phantom_center = np.array([0., 0., 0.])
 region_masks = compute_spherical_region_masks(region_centers, region_radii,
@@ -103,7 +103,7 @@ gm_mask = compute_spherical_region_masks([phantom_center],
                                          [phantom_radius], args.res, 
                                          phantom_fov)[..., 0]
 
-print "\tComputing volume fraction for each tissue type."
+print("\tComputing volume fraction for each tissue type.")
 background_vf, gm_vf, wm_vf, csf_vf = \
     compute_volume_fractions(np.asarray([0, 0, 0,]), phantom_radius, gm_mask,
                              fibers, fiber_masks,
@@ -111,7 +111,7 @@ background_vf, gm_vf, wm_vf, csf_vf = \
                              args.res, phantom_fov)
 
 
-print "\tPreparing relaxation time fields for each tissue."
+print("\tPreparing relaxation time fields for each tissue.")
 # First initialize the random number generator - if seed provided
 rng = np.random.RandomState(args.seed)
 image_shape = gm_mask.shape
@@ -120,7 +120,7 @@ gm_t1, gm_t2 = relaxation_time_images(image_shape, 'gm', rng=rng)
 csf_t1, csf_t2 = relaxation_time_images(image_shape, 'csf', rng=rng)
 
 
-print "\tSimulate T1- and T2-weighted images"
+print("\tSimulate T1- and T2-weighted images")
 short_te, long_te = 0.01, 0.09
 short_tr, long_tr = 0.1, 5.0
 
@@ -134,18 +134,18 @@ t2_weighted = mr_signal(wm_vf, wm_t1, wm_t2,
               csf_vf, csf_t1, csf_t2,
               long_te, long_tr)
 
-print "\tCorrupt images by Rician noise"
+print("\tCorrupt images by Rician noise")
 if args.snr > 0.:
     sigma = 1 / args.snr
     t1_weighted = rician_noise(t1_weighted, sigma, rng=rng)
     t2_weighted = rician_noise(t2_weighted, sigma, rng=rng)
 
-print "\tChange image type to INT16"
+print("\tChange image type to INT16")
 scale = 2 ** 14
 t1_weighted = np.asarray(scale * t1_weighted, dtype=np.int16)
 t2_weighted = np.asarray(scale * t2_weighted, dtype=np.int16)
 
-print "\tWrite images to disk"
+print("\tWrite images to disk")
 t1_weighted_img = nib.Nifti1Image(t1_weighted, affine)
 nib.save(t1_weighted_img, os.path.join(args.output_dir, "t1_weighted.nii.gz"))
 

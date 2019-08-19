@@ -191,18 +191,18 @@ def compute_face_areas(vertices, faces):
 
 if __name__=='__main__':
     tessellation_order = 3
-    print "Computing recursive tessellation of order %d" % tessellation_order
+    print("Computing recursive tessellation of order %d" % tessellation_order)
     vertices, faces, nb_edges, centers, areas = \
         tessellation(tessellation_order, face_centers=True, face_areas=True)
     centers *= 1.01
 
-    print "Order = %d, nb_vertices=%d, nb_faces=%d, nb_edges=%d" \
-              % (tessellation_order, vertices.shape[0], len(faces), nb_edges)
+    print("Order = %d, nb_vertices=%d, nb_faces=%d, nb_edges=%d" \
+              % (tessellation_order, vertices.shape[0], len(faces), nb_edges))
 
     face_surface = 2 * np.pi / len(faces)
     dist_face_centers = np.sqrt((2 * face_surface) / (3 * np.sqrt(3)))
     angle_face_centers = 2 * np.arcsin((dist_face_centers / 2)) * 180 / np.pi
-    print "Angle between two cell centers: %.1f (approx)" % angle_face_centers
+    print("Angle between two cell centers: %.1f (approx)" % angle_face_centers)
     
     verts = np.zeros((len(faces), 3, 3))
     for i in range(len(faces)):

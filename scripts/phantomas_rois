@@ -37,7 +37,7 @@ parser.add_argument('--fov', type=float, default=None,
 args = parser.parse_args()
 
 
-print "Reading geometry description..."
+print("Reading geometry description...")
 #######################################
 geometry = json.load(args.geometry)
 
@@ -68,7 +68,7 @@ if phantom_fov == None:
     phantom_fov = 2.2 * phantom_radius
 
 
-print "Preparing rois for connectivity..."
+print("Preparing rois for connectivity...")
 ##########################################
 affine = compute_affine_matrix(args.res, phantom_fov)
 target_rois, connectivity_matrix = target_rois(fibers, args.res, phantom_fov)

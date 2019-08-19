@@ -43,7 +43,7 @@ colors = ['#FF1E00', '#FFB300', '#1533AD', '#00BF32', '#BF4030',
 
 color = iter(colors)
 
-print "Reading geometry description..."
+print("Reading geometry description...")
 #######################################
 geometry = json.load(args.geometry)
 
@@ -61,7 +61,7 @@ for fiber_name, fiber_params in fibers_dict.items():
     f = FiberSource(control_points, tangents=tangents_mode)
     fiber = Fiber('from_points', points=f(ts), radius=radius)
     fibers.append(fiber)
-    view = ViewFiber(fiber, ren, color=color.next(), label=fiber_name)
+    view = ViewFiber(fiber, ren, color=next(color), label=fiber_name)
 
 # Read Isotropic regions
 regions_dict = geometry.get("isotropic_regions", {})
@@ -74,7 +74,7 @@ for region_name, region_params in regions_dict.items():
     region_radii.append(radius)
     volume_fraction = region_params.get("volume_fraction", 1.0)
     isotropic_region = IsotropicRegion(radius, center, volume_fraction)
-    view = ViewIsotropicRegion(isotropic_region, ren, color=color.next(), 
+    view = ViewIsotropicRegion(isotropic_region, ren, color=next(color), 
                                label=region_name)
 
 # Read other phantom parameters

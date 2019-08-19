@@ -200,5 +200,4 @@ def compute_fod_sh(fod_samples, fod_weights, kappa=30, order_sh=8):
         coeff_vmf = x_l(kappa, l) * np.sqrt(4*np.pi / (2*l + 1))
         H[:, shm.dimension(l-2):shm.dimension(l)] *= coeff_vmf
     H *= fod_weights[:, np.newaxis]
-    print H.shape
     return H.sum(0)
