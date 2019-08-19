@@ -21,32 +21,32 @@ import nibabel as nib
 # Function to check if file exists
 def is_valid_file(parser, arg):
     if not os.path.exists(arg):
-       parser.error("Cannot open file %s." % arg)
+        parser.error("Cannot open file %s." % arg)
     else:
-       return open(arg, 'r')
+        return open(arg, 'r')
 
 
 # The command-line arguments parser.
 ####################################
-description="Simulates T1- and T2-weighted images from the description of a phantom."
+description = "Simulates T1- and T2-weighted images from the description of a phantom."
 
 parser = argparse.ArgumentParser(description=description)
 parser.add_argument('geometry',
-                    type=lambda x: is_valid_file(parser,x),
+                    type=lambda x: is_valid_file(parser, x),
                     help="A JSON-formatted file describing fiber and "
                          "phantom geometries.")
 parser.add_argument('-o', dest="output_dir", default=".",
                     help="Output directory.")
 parser.add_argument('--res', type=float, default=1.0,
                     help="Structural (T1 and T2) images resolution in mm.")
-parser.add_argument('--fov', type=float, default=None, 
+parser.add_argument('--fov', type=float, default=None,
                     help="Field of view in mm. If None, adapts to the size "
                          "of the phantom.")
 parser.add_argument('--snr', type=float, default=100.,
                     help="Signal-to-noise ratio of the simulated images. "
                          "0.0 for noise-free images")
 parser.add_argument('--seed', type=int, default=None,
-                     help="Seed for the random number generator.")
+                    help="Seed for the random number generator.")
 args = parser.parse_args()
 
 
@@ -82,12 +82,12 @@ print("Found %d regions." % len(region_centers))
 
 # Read other phantom parameters
 phantom_radius = geometry.get("phantom_radius", None)
-if phantom_radius == None:
+if phantom_radius is None:
     fiber = fibers[0].get_points()
     phantom_radius = np.linalg.norm(fiber[0])
 
 phantom_fov = args.fov
-if phantom_fov == None:
+if phantom_fov is None:
     phantom_fov = 2.2 * phantom_radius
 
 
@@ -99,13 +99,13 @@ phantom_center = np.array([0., 0., 0.])
 region_masks = compute_spherical_region_masks(region_centers, region_radii,
                                               args.res, phantom_fov)
 fiber_masks = compute_fiber_masks(fibers, args.res, phantom_fov)
-gm_mask = compute_spherical_region_masks([phantom_center], 
-                                         [phantom_radius], args.res, 
+gm_mask = compute_spherical_region_masks([phantom_center],
+                                         [phantom_radius], args.res,
                                          phantom_fov)[..., 0]
 
 print("\tComputing volume fraction for each tissue type.")
 background_vf, gm_vf, wm_vf, csf_vf = \
-    compute_volume_fractions(np.asarray([0, 0, 0,]), phantom_radius, gm_mask,
+    compute_volume_fractions(np.asarray([0, 0, 0, ]), phantom_radius, gm_mask,
                              fibers, fiber_masks,
                              region_centers, region_radii, region_masks,
                              args.res, phantom_fov)
@@ -125,14 +125,14 @@ short_te, long_te = 0.01, 0.09
 short_tr, long_tr = 0.1, 5.0
 
 t1_weighted = mr_signal(wm_vf, wm_t1, wm_t2,
-              gm_vf, gm_t1, gm_t2,
-              csf_vf, csf_t1, csf_t2,
-              short_te, short_tr)
+                        gm_vf, gm_t1, gm_t2,
+                        csf_vf, csf_t1, csf_t2,
+                        short_te, short_tr)
 
 t2_weighted = mr_signal(wm_vf, wm_t1, wm_t2,
-              gm_vf, gm_t1, gm_t2,
-              csf_vf, csf_t1, csf_t2,
-              long_te, long_tr)
+                        gm_vf, gm_t1, gm_t2,
+                        csf_vf, csf_t1, csf_t2,
+                        long_te, long_tr)
 
 print("\tCorrupt images by Rician noise")
 if args.snr > 0.:

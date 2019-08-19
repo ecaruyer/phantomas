@@ -2,16 +2,12 @@
 Model definition for the fibers geometry. A ``Fiber`` is a discrete
 representation of a white matter fiber bundle.
 """
-from numpy import *
-from scipy import interpolate
-from phantomas.geometry import utils
-import os
 import numpy as np
 
 
 class Fiber():
     """
-    A Fiber is a cylindrical shape wrapped around a discrete curve in 3D, 
+    A Fiber is a cylindrical shape wrapped around a discrete curve in 3D,
     represented by its discretization over a certain number of points.
 
     Parameters
@@ -25,13 +21,13 @@ class Fiber():
     radius : double
         The radius of the fiber bundle in mm.
     """
+
     def __init__(self, mode, **kwargs):
         if mode == 'from_points':
             points = kwargs.get('points')
             tangents = kwargs.get('tangents', None)
             radius = kwargs.get('radius', 1.0)
             self._create_from_points(points, tangents, radius)
-
 
     def _create_from_points(self, points, tangents, radius):
         """
@@ -49,7 +45,6 @@ class Fiber():
         self.nb_points = points.shape[0]
         self.radius = radius
 
-
     def set_radius(self, radius):
         """
         Sets the radius of the fiber bundle.
@@ -59,7 +54,6 @@ class Fiber():
         radius : double
         """
         self.radius = radius
-
 
     def get_radius(self):
         """
@@ -71,17 +65,15 @@ class Fiber():
         """
         return self.radius
 
-
     def get_points(self):
         """
         Gets the points of the fiber bundle centerline.
-        
+
         Returns
         -------
         points : array-like, shape (N, 3)
         """
         return self.points
-
 
     def get_nb_points(self):
         """
@@ -93,7 +85,6 @@ class Fiber():
         """
         return self.nb_points
 
-
     def save_to_file(self, index, path='.'):
         """
         Saves the fiber trajectory to a text file.
@@ -101,7 +92,7 @@ class Fiber():
         Parameters
         ----------
         index : int
-            The identifier of the fiber bundle (will be used to format the 
+            The identifier of the fiber bundle (will be used to format the
             filename).
         path : string
             The output path.
@@ -109,15 +100,14 @@ class Fiber():
         file_name = '%s/fiber_%02d_r%.6f.txt' % (path, index, self.radius)
         savetxt(fileName, self.points)
 
-
     def intersects_bounding_box(self, bounding_box_extents):
         """
-        Computes logical intersection between current instance and given 
+        Computes logical intersection between current instance and given
         bounding box.
 
         Parameters
         ----------
-        bounding_box_extents : tuple 
+        bounding_box_extents : tuple
             (x_min, x_max, y_min, y_max, z_min, z_max)
 
         Returns
@@ -129,24 +119,24 @@ class Fiber():
         radius = self.get_radius()
         points = self.get_points()
 
-        matching_points = np.logical_and(points[:, 0] > x_min - radius, 
+        matching_points = np.logical_and(points[:, 0] > x_min - radius,
                                          points[:, 0] < x_max + radius)
-        matching_points = np.logical_and(matching_points, 
+        matching_points = np.logical_and(matching_points,
                                          points[:, 1] > y_min - radius)
-        matching_points = np.logical_and(matching_points, 
+        matching_points = np.logical_and(matching_points,
                                          points[:, 1] < y_max + radius)
-        matching_points = np.logical_and(matching_points, 
+        matching_points = np.logical_and(matching_points,
                                          points[:, 2] > z_min - radius)
-        matching_points = np.logical_and(matching_points, 
+        matching_points = np.logical_and(matching_points,
                                          points[:, 2] < z_max + radius)
- 
+
         return np.count_nonzero(matching_points) > 0
 
 
 class IsotropicRegion():
     """
-    An ``IsotropicRegion`` is a spherical region defined by its radius and 
-    center. It usually defines a region of rapid diffusivity, modelling a 
+    An ``IsotropicRegion`` is a spherical region defined by its radius and
+    center. It usually defines a region of rapid diffusivity, modelling a
     cerebro-spinal fluid-filled region, such as ventricle.
 
     Parameters
@@ -161,7 +151,6 @@ class IsotropicRegion():
         self.center = center
         self.volume_fraction = volume_fraction
 
-
     def get_radius(self):
         """
         Returns
@@ -172,15 +161,13 @@ class IsotropicRegion():
         """
         return self.radius
 
-
     def get_center(self):
         """
         Returns
         -------
         center : array-like, shape (3, )
-            The center position of the ``IsotropicRegion``, in real-world 
+            The center position of the ``IsotropicRegion``, in real-world
             coordinates.
 
         """
         return self.center
-

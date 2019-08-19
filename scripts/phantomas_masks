@@ -8,30 +8,30 @@ import nibabel as nib
 from phantomas.geometry.fiber import FiberSource
 from phantomas.geometry.models import Fiber
 from phantomas.mr_simul.partial_volume \
-   import (compute_affine_matrix, 
-           compute_spherical_region_masks,
-           compute_fiber_masks)
+    import (compute_affine_matrix,
+            compute_spherical_region_masks,
+            compute_fiber_masks)
 
 
 # Function to check if file exists
 def is_valid_file(parser, arg):
     if not os.path.exists(arg):
-       parser.error("Cannot open file %s." % arg)
+        parser.error("Cannot open file %s." % arg)
     else:
-       return open(arg, 'r')
+        return open(arg, 'r')
 
 
 # The command-line arguments parser.
 ####################################
-description="Prepare regions of interest for connectivity analysis."
+description = "Prepare regions of interest for connectivity analysis."
 
 parser = argparse.ArgumentParser(description=description)
 parser.add_argument('geometry',
-                    type=lambda x: is_valid_file(parser,x),
+                    type=lambda x: is_valid_file(parser, x),
                     help="A JSON-formatted file describing fiber and phantom "
                          "geometries.")
 parser.add_argument('--res', type=float, default=2.0,
-    help="Diffusion-weighted images resolution in mm.")
+                    help="Diffusion-weighted images resolution in mm.")
 parser.add_argument('--fov', type=float, default=None,
                     help="Field of view in mm. If None, adapts to the size "
                          "of the phantom.")
@@ -72,12 +72,12 @@ print("Found %d regions." % len(region_centers))
 
 # Read other phantom parameters
 phantom_radius = geometry.get("phantom_radius", None)
-if phantom_radius == None:
+if phantom_radius is None:
     fiber = fibers[0].get_points()
     phantom_radius = np.linalg.norm(fiber[0])
 
 phantom_fov = args.fov
-if phantom_fov == None:
+if phantom_fov is None:
     phantom_fov = 2.2 * phantom_radius
 
 
@@ -93,17 +93,17 @@ gm_mask = compute_spherical_region_masks([phantom_center],
 
 
 nb_fibers = len(fibers)
-csf_mask = np.any(region_masks==2, axis=-1)
+csf_mask = np.any(region_masks == 2, axis=-1)
 for i in range(nb_fibers):
-    fiber_mask = np.logical_and(np.logical_not(csf_mask), 
+    fiber_mask = np.logical_and(np.logical_not(csf_mask),
                                 fiber_masks[..., i] > 0)
     fiber_mask = np.logical_and(fiber_mask, gm_mask > 0)
     fiber_mask = np.asarray(fiber_mask, dtype=np.uint8)
     fiber_mask_img = nib.Nifti1Image(fiber_mask, affine)
-    nib.save(fiber_mask_img, os.path.join(args.out_dir, 
+    nib.save(fiber_mask_img, os.path.join(args.out_dir,
                                           "fiber_%02d.nii.gz" % i))
 
-fibers_mask = np.logical_and(np.logical_not(csf_mask), 
+fibers_mask = np.logical_and(np.logical_not(csf_mask),
                              np.any(fiber_masks > 0, axis=-1))
 fibers_mask = np.asarray(fibers_mask, dtype=np.uint8)
 fibers_mask_img = nib.Nifti1Image(fibers_mask, affine)

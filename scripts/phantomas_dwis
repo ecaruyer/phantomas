@@ -29,19 +29,19 @@ import sys
 # Function to check if file exists
 def is_valid_file(parser, arg):
     if not os.path.exists(arg):
-       parser.error("Cannot open file %s." % arg)
+        parser.error("Cannot open file %s." % arg)
     else:
-       return open(arg, 'r')
+        return open(arg, 'r')
 
 
 # The command-line arguments parser.
 ####################################
-description="Simulates diffusion-weighted images from the description of a " \
-            "phantom."
+description = "Simulates diffusion-weighted images from the description of a " \
+    "phantom."
 
 parser = argparse.ArgumentParser(description=description)
 parser.add_argument('geometry',
-                    type=lambda x: is_valid_file(parser,x),
+                    type=lambda x: is_valid_file(parser, x),
                     help="A JSON-formatted file describing fiber and phantom "
                          "geometries.")
 parser.add_argument('-b', dest='bvals', required=True,
@@ -61,18 +61,18 @@ parser.add_argument('--snr', type=float, default=100.,
                     help="Signal-to-noise ratio of the simulated images. "
                          "0.0 for noise-free images. (%(default)s)")
 parser.add_argument('--seed', type=int, default=None,
-                     help="Seed for the random number generator. (%(default)s)")
+                    help="Seed for the random number generator. (%(default)s)")
 parser.add_argument('--lambda1', type=float, default=1.7e-3,
-                     help="Lambda 1 parameter of the fiber tensor. (%(default)s)")
+                    help="Lambda 1 parameter of the fiber tensor. (%(default)s)")
 parser.add_argument('--lambda2', type=float, default=0.2e-3,
-                     help="Lambda 2 and 3 parameters of the fiber tensor. (%(default)s)")
+                    help="Lambda 2 and 3 parameters of the fiber tensor. (%(default)s)")
 parser.add_argument('--order_sh', type=int, default=8, metavar='ORDER',
-                     help="Spherical harmonics truncation order for the FOD. (%(default)s)")
+                    help="Spherical harmonics truncation order for the FOD. (%(default)s)")
 parser.add_argument('--export_fod', default=None, metavar='BASIS',
-                     help="Either 'dipy' or 'mrtrix': sets the convention of "
-                          "the exported FODs.")
-parser.add_argument('--export_vf',  action='store_true', required=False,
-                   default=False, help='If supplied, saves the volume fraction for each tissue type.')
+                    help="Either 'dipy' or 'mrtrix': sets the convention of "
+                    "the exported FODs.")
+parser.add_argument('--export_vf', action='store_true', required=False,
+                    default=False, help='If supplied, saves the volume fraction for each tissue type.')
 
 args = parser.parse_args()
 
@@ -116,12 +116,12 @@ print("Found %d regions." % len(region_centers))
 
 # Read other phantom parameters
 phantom_radius = geometry.get("phantom_radius", None)
-if phantom_radius == None:
+if phantom_radius is None:
     fiber = fibers[0].get_points()
     phantom_radius = np.linalg.norm(fiber[0])
 
 phantom_fov = args.fov
-if phantom_fov == None:
+if phantom_fov is None:
     phantom_fov = 2.2 * phantom_radius
 
 
@@ -155,7 +155,7 @@ gm_mask = compute_spherical_region_masks([phantom_center],
 
 print("\tComputing volume fraction for each tissue type.")
 background_vf, gm_vf, wm_vf, csf_vf = \
-    compute_volume_fractions(np.asarray([0, 0, 0,]), phantom_radius, gm_mask,
+    compute_volume_fractions(np.asarray([0, 0, 0, ]), phantom_radius, gm_mask,
                              fibers, fiber_masks,
                              region_centers, region_radii, region_masks,
                              args.res, phantom_fov)
@@ -209,7 +209,7 @@ if args.export_fod is not None:
         fods_img = nib.Nifti1Image(fods * wm_vf[..., np.newaxis], affine)
     elif args.export_fod == "mrtrix":
         conversion_matrix = shm.convert_to_mrtrix(order_sh)
-        fods_img = nib.Nifti1Image(np.dot(fods, conversion_matrix.T) \
+        fods_img = nib.Nifti1Image(np.dot(fods, conversion_matrix.T)
                                    * wm_vf[..., np.newaxis], affine)
     nib.save(fods_img, os.path.join(args.output_dir, "fods.nii.gz"))
 
@@ -262,13 +262,13 @@ b0_csf = mr_signal(0 * wm_vf, wm_t1, wm_t2,
                    csf_vf, csf_t1, csf_t2,
                    te, tr)
 dwis = b0_wm[..., np.newaxis] * wm_attenuation \
-     + b0_gm[..., np.newaxis] * gm_attenuation \
-     + b0_csf[..., np.newaxis] * csf_attenuation
+    + b0_gm[..., np.newaxis] * gm_attenuation \
+    + b0_csf[..., np.newaxis] * csf_attenuation
 
 print("\tCorrupt images by Rician noise")
 if args.snr > 0.:
-    wm_mean_t1, wm_mean_t2, wm_rho = get_tissue_physical_parameters('wm')  
-    s0 = wm_rho * (1.0 - np.exp(-tr / wm_mean_t1)) * np.exp(-te / wm_mean_t2)    
+    wm_mean_t1, wm_mean_t2, wm_rho = get_tissue_physical_parameters('wm')
+    s0 = wm_rho * (1.0 - np.exp(-tr / wm_mean_t1)) * np.exp(-te / wm_mean_t2)
     sigma = s0 / args.snr
     dwis = rician_noise(dwis, sigma, rng=rng)
 
