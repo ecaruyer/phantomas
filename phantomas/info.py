@@ -47,7 +47,6 @@ REQUIRES = [
     'numpy',
     'scikit-sparse',
     'scipy',
-    'wsgiref',
 ]
 
 # Required before running setup()

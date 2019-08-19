@@ -4,4 +4,3 @@ argparse
 scipy
 nibabel
 scikit-sparse
-wsgiref
