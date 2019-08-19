@@ -5,7 +5,7 @@ Spherical Harmonics basis as defined in [1]_.
 References
 ----------
 .. [1] Descoteaux, Maxime, Elaine Angelino, Shaun Fitzgibbons, and Rachid
-   Deriche. "Regularized, fast, and robust analytical Q-ball imaging" 
+   Deriche. "Regularized, fast, and robust analytical Q-ball imaging"
    Magnetic Resonance in Medicine 58, no. 3 (2007): 497-510
 
 """
@@ -17,7 +17,7 @@ import hashlib
 
 def angular_function(j, theta, phi):
     """
-    Returns the values of the spherical harmonics function at given 
+    Returns the values of the spherical harmonics function at given
     positions specified by colatitude and aximuthal angles.
 
     Parameters
@@ -48,7 +48,7 @@ def angular_function(j, theta, phi):
 
 def spherical_function(j, x, y, z):
     """
-    Returns the values of the spherical harmonics function at given 
+    Returns the values of the spherical harmonics function at given
     positions specified by Cartesian coordinates.
 
     Parameters
@@ -68,20 +68,20 @@ def spherical_function(j, x, y, z):
 
 def dimension(order):
     r"""
-    Returns the dimension, :math:`R`, of the real, antipodally symmetric 
+    Returns the dimension, :math:`R`, of the real, antipodally symmetric
     spherical harmonics basis for a given truncation order.
-    
+
     Parameters
     ----------
     order : int
         The trunction order.
-    
+
     Returns
     -------
     R : int
         The dimension of the truncated spherical harmonics basis.
     """
-    return (order + 1) * (order + 2) / 2
+    return int((order + 1) * (order + 2) / 2)
 
 
 def j(l, m):
@@ -108,7 +108,7 @@ def j(l, m):
 
 def sh_degree(j):
     """
-    Returns the degree, ``l``, of the spherical harmonic associated to index 
+    Returns the degree, ``l``, of the spherical harmonic associated to index
     ``j``.
 
     Parameters
@@ -129,7 +129,7 @@ def sh_degree(j):
 
 def sh_order(j):
     """
-    Returns the order, ``m``, of the spherical harmonic associated to index 
+    Returns the order, ``m``, of the spherical harmonic associated to index
     ``j``.
 
     Parameters
@@ -181,12 +181,12 @@ class _CachedMatrix():
             val = self._eval_matrix(theta, phi, order)
             self._cache[(key1, key2, order)] =  val
             return val
-        
+
 
     def _hash(self, np_array):
         return hashlib.sha1(np_array).hexdigest()
 
-   
+
     def _eval_matrix(self, theta, phi, order):
         N = theta.shape[0]
         dim_sh = dimension(order)
@@ -194,7 +194,7 @@ class _CachedMatrix():
         ms = [m for L in range(0, order + 1, 2) for m in range(-L, L+1)]
         ls = np.asarray(ls, dtype=np.int)[np.newaxis, :]
         ms = np.asarray(ms, dtype=np.int)[np.newaxis, :]
-        sh = sph_harm(np.abs(ms), ls, 
+        sh = sph_harm(np.abs(ms), ls,
                       phi[:, np.newaxis], theta[:, np.newaxis])
         H = np.where(ms > 0, sh.imag, sh.real)
         H[:, (ms != 0)[0]] *= np.sqrt(2)
@@ -237,7 +237,7 @@ def P(order=4):
 
 def convert_to_mrtrix(order):
     """
-    Returns the linear matrix used to convert coefficients into the mrtrix 
+    Returns the linear matrix used to convert coefficients into the mrtrix
     convention for spherical harmonics.
 
     Parameters

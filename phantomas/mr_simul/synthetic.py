@@ -11,10 +11,10 @@ References
    259-267
 .. [2] T. E. J. Behrens, M. W. Woolrich, M. Jenkinson, H. Johansen-Berg, R. G.
    Nunes, S. Clare, P. M. Matthews, J. M. Brady, and S. M. Smith.
-   "Characterization and propagation of uncertainty in diffusion-weighted 
+   "Characterization and propagation of uncertainty in diffusion-weighted
    MR Imaging." Magnetic Resonance in Medicine 50, no. 5 (2003): 1077-1088.
-.. [3] Soderman, Olle, and Bengt Jonsson. "Restricted diffusion in cylindrical 
-   geometry." Journal of Magnetic Resonance, Series A 117, no. 1 (1995): 
+.. [3] Soderman, Olle, and Bengt Jonsson. "Restricted diffusion in cylindrical
+   geometry." Journal of Magnetic Resonance, Series A 117, no. 1 (1995):
    94-97.
 
 """
@@ -24,15 +24,15 @@ from numpy.polynomial.legendre import Legendre
 
 
 class AxiallySymmetricModel():
-    """This class is an abstract class which defines the interface for all the 
+    """This class is an abstract class which defines the interface for all the
     synthetic models in use in phantomas.
 
     """
 
     def signal(self, qnorms, thetas, tau=1 / (4 * np.pi**2)):
         r"""
-        Returns the simulated signal attenuation. The angles thetas correspond 
-        to the angles between the sampling directions and the principal axis 
+        Returns the simulated signal attenuation. The angles thetas correspond
+        to the angles between the sampling directions and the principal axis
         of the diffusion model. Must be implemented in subclasses.
 
         Parameters
@@ -44,7 +44,7 @@ class AxiallySymmetricModel():
         tau : double
             Diffusion time in s.
 
-        """ 
+        """
         raise NotImplementedError("The method signal must be implemented in "
                                   "subclasses.")
 
@@ -62,12 +62,12 @@ class AxiallySymmetricModel():
         """
         raise NotImplementedError("The method signal must be implemented in "
                                   "subclasses")
-    
-    
-    def signal_convolution_sh(self, order, qnorm, tau=1 / (4 * np.pi**2), 
+
+
+    def signal_convolution_sh(self, order, qnorm, tau=1 / (4 * np.pi**2),
                               nb_samples=100):
         r"""
-        Returns the convolution operator in spherical harmonics basis, using 
+        Returns the convolution operator in spherical harmonics basis, using
         the Funk-Hecke theorem as described in [1]_.
 
         Parameters
@@ -79,7 +79,7 @@ class AxiallySymmetricModel():
         tau : double
             The diffusion time in s.
         nb_samples : int
-            The number of samples controling the accuracy of the numerical 
+            The number of samples controling the accuracy of the numerical
             integral.
 
         Note
@@ -91,7 +91,7 @@ class AxiallySymmetricModel():
         References
         ----------
         .. [1] Descoteaux, Maxime. "High angular resolution diffusion MRI: from
-               local estimation to segmentation and tractography." PhD diss., 
+               local estimation to segmentation and tractography." PhD diss.,
                Universite de Nice Sophia-Antipolis, France, 2010.
 
         """
@@ -105,21 +105,21 @@ class AxiallySymmetricModel():
             coeffs = np.zeros(l + 1)
             coeffs[l] = 1.0
             H[l, :] = Legendre(coeffs)(cos_thetas)
-        ls = map(shm.sh_degree, range(dim_sh))
+        ls = list(map(shm.sh_degree, range(dim_sh)))
         rs = np.dot(H, fir) / nb_samples
-        return rs[ls] 
-        
+        return rs[ls]
+
 
 class GaussianModel(AxiallySymmetricModel):
     r"""
-    This class models a Gaussian diffusion tensor wot axial symmetry. 
-    Typically, the eigenvalues of this tensors are 
+    This class models a Gaussian diffusion tensor wot axial symmetry.
+    Typically, the eigenvalues of this tensors are
     :math:`\lambda_1 \gg \lambda_2 = \lambda_3`.
 
     Parameters
     ----------
     lambda1 : double
-        The eigenvalue associated with the principal direction, in 
+        The eigenvalue associated with the principal direction, in
         mm\ :sup:`2`/s.
     lambda2 : double
         The eigenvalue associated with the two minor eigenvectors, in
@@ -130,11 +130,11 @@ class GaussianModel(AxiallySymmetricModel):
         self.lambda1 = lambda1
         self.lambda2 = lambda2
 
- 
+
     def signal(self, qnorms, thetas, tau=1 / (4 * np.pi**2)):
-        r"""Returns the simulated signal attenuation, following the Stejskal 
-        and Tanner [1]_ equation. The angles thetas correspond to the angles 
-        between the sampling directions and the principal axis of the 
+        r"""Returns the simulated signal attenuation, following the Stejskal
+        and Tanner [1]_ equation. The angles thetas correspond to the angles
+        between the sampling directions and the principal axis of the
         diffusion tensor.
 
         Parameters
