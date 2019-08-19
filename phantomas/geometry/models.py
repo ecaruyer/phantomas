@@ -4,7 +4,7 @@ representation of a white matter fiber bundle.
 """
 from numpy import *
 from scipy import interpolate
-import utils
+from phantomas.geometry import utils
 import os
 import numpy as np
 
