@@ -10,8 +10,7 @@ References
 
 """
 import numpy as np
-from scipy.misc import factorial
-from scipy.special import lpmv, legendre, sph_harm
+from scipy.special import lpmv, legendre, sph_harm, factorial
 import hashlib
 
 
