@@ -80,7 +80,7 @@ def dimension(order):
     R : int
         The dimension of the truncated spherical harmonics basis.
     """
-    return (order + 1) * (order + 2) / 2
+    return ((order + 1) * (order + 2)) // 2
 
 
 def j(l, m):

@@ -105,7 +105,7 @@ class AxiallySymmetricModel():
             coeffs = np.zeros(l + 1)
             coeffs[l] = 1.0
             H[l, :] = Legendre(coeffs)(cos_thetas)
-        ls = map(shm.sh_degree, range(dim_sh))
+        ls = list(map(shm.sh_degree, range(dim_sh)))
         rs = np.dot(H, fir) / nb_samples
         return rs[ls] 
         
