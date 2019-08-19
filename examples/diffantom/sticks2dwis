@@ -112,7 +112,7 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-print "\tReading volume fractions of tissues."
+print("\tReading volume fractions of tissues.")
 vfs_im = [nb.load(f) for f in args.tissue_vf_fname]
 ts_vfs = np.nan_to_num(nb.concat_images(vfs_im).get_data())
 
@@ -120,12 +120,12 @@ ts_vfs = np.nan_to_num(nb.concat_images(vfs_im).get_data())
 affine = vfs_im[0].get_affine()
 image_shape = vfs_im[0].get_shape()
 
-print "\tReading volume fractions of fibers."
+print("\tReading volume fractions of fibers.")
 sf_img = [nb.load(f) for f in args.sticks_vfs]
 affine = sf_img[0].get_affine()
 sf_vfs = np.nan_to_num(nb.concat_images(sf_img).get_data())
 
-print "\tReading directions of fibers."
+print("\tReading directions of fibers.")
 nsf = len(args.dirs)
 sticks = np.nan_to_num(nb.load(args.dirs[0]).get_data())[..., np.newaxis]
 
@@ -133,7 +133,7 @@ for i in range(1, nsf):
     stdata = np.nan_to_num(nb.load(args.dirs[i]).get_data())
     sticks = np.concatenate((sticks, stdata[..., np.newaxis]), axis=4)
 
-print "\tNormalizing fractions to sum up 1.0..."
+print("\tNormalizing fractions to sum up 1.0...")
 total_vf = np.sum(ts_vfs, axis=3) + np.sum(sf_vfs, axis=3)
 ts_vfs[total_vf > 0] /= total_vf[total_vf > 0, np.newaxis]
 sf_vfs[total_vf > 0] /= total_vf[total_vf > 0, np.newaxis]
@@ -150,7 +150,7 @@ outmsk = np.zeros_like(total_vf, dtype=np.uint8)
 outmsk[total_vf > 0.0] = 1
 nb.Nifti1Image(outmsk, affine, None).to_filename(args.mskfile)
 
-print "\tWriting fractions that will be simulated..."
+print("\tWriting fractions that will be simulated...")
 
 for i in range(nsf):
     nb.Nifti1Image(sf_vfs[..., i], affine).to_filename("vf_sf%02d.nii.gz" % i)
@@ -158,7 +158,7 @@ for i in range(nsf):
 for i in range(len(vfs_im)):
     nb.Nifti1Image(ts_vfs[..., i], affine).to_filename("vf_iso%02d.nii.gz" % i)
 
-print "\tReading acquisition sequence..."
+print("\tReading acquisition sequence...")
 bvals = np.loadtxt(args.bvals)
 bvecs = np.loadtxt(args.bvecs)
 nb_acquisitions = bvals.shape[0]
@@ -172,11 +172,11 @@ gradient_directions = bvecs[indices_dwis]
 gradient_bvals = bvals[indices_dwis]
 np.clip(gradient_directions, -1, 1, gradient_directions)
 
-print "Preparing diffusion-weighted images..."
+print("Preparing diffusion-weighted images...")
 ###############################################
 
 
-print "\tPreparing relaxation time fields for each tissue."
+print("\tPreparing relaxation time fields for each tissue.")
 # First initialize the random number generator - if seed provided
 rng = np.random.RandomState(args.seed)
 dim_x, dim_y, dim_z = image_shape
@@ -185,7 +185,7 @@ gm_t1, gm_t2 = relaxation_time_images(image_shape, 'gm', rng=rng)
 csf_t1, csf_t2 = relaxation_time_images(image_shape, 'csf', rng=rng)
 
 
-print "\tComputing fiber orientation distribution."
+print("\tComputing fiber orientation distribution.")
 wm_mask = sf_vfs.sum(axis=3)
 order_sh = args.order_sh
 dim_sh = shm.dimension(order_sh)
@@ -200,7 +200,7 @@ for i, j, k in zip(wm_indices[0], wm_indices[1], wm_indices[2]):
 
 
 if args.export_fod is not None:
-    print "Exporting fods following %s's convention." % args.export_fod
+    print("Exporting fods following %s's convention." % args.export_fod)
     if args.export_fod == "dipy":
         fods_img = nb.Nifti1Image(fods * wm_vf[..., np.newaxis], affine)
     elif args.export_fod == "mrtrix":
@@ -210,7 +210,7 @@ if args.export_fod is not None:
     nb.save(fods_img, "fods.nii.gz")
 
 
-print "\tCompute diffusion signal attenuation of isotropic compartments."
+print("\tCompute diffusion signal attenuation of isotropic compartments.")
 wm_freediff = args.diff_iso[2]
 wm_att_free = ts_vfs[..., 2, np.newaxis] \
     * np.exp(-bvals * wm_freediff)[np.newaxis, np.newaxis, np.newaxis, :]
@@ -228,7 +228,7 @@ csf_attenuation = np.ones((dim_x, dim_y, dim_z, nb_acquisitions)) \
     * np.exp(-bvals * csf_diffusivity)[np.newaxis, np.newaxis, np.newaxis, :]
 
 
-print "\tPrepare synthetic model of diffusion and convolution with FOD."
+print("\tPrepare synthetic model of diffusion and convolution with FOD.")
 lambda1 = args.lambda1
 lambda2 = args.lambda2
 model = GaussianModel(lambda1, lambda2)
@@ -251,7 +251,7 @@ wm_attenuation_img = nb.Nifti1Image(wm_attenuation, affine)
 nb.save(wm_attenuation_img, "wm_attenuation.nii.gz")
 
 
-print "\tCompute diffusion-weighted images"
+print("\tCompute diffusion-weighted images")
 te, tr = 0.09, 5.0
 b0_wm = mr_signal(wm_vf, wm_t1, wm_t2,
                   0 * gm_vf, gm_t1, gm_t2,
@@ -275,7 +275,7 @@ dwis = b0_wm[..., np.newaxis] * wm_attenuation \
     + b0_csf[..., np.newaxis] * csf_attenuation \
     + b0_wm[..., np.newaxis] * wm_att_free
 
-print "\tCorrupt images by Rician noise"
+print("\tCorrupt images by Rician noise")
 if args.snr > 0.:
     wm_mean_t1, wm_mean_t2, wm_rho = get_tissue_physical_parameters('wm')
     s0 = wm_rho * (1.0 - np.exp(-tr / wm_mean_t1)) * np.exp(-te / wm_mean_t2)
@@ -286,7 +286,7 @@ out_dtype = np.float32
 scale = 2000
 
 if args.out_type != 'float':
-    print "\tChange image type to %s" % args.out_type
+    print("\tChange image type to %s" % args.out_type)
     if args.out_type == 'uint8':
         out_dtype = np.uint8
         if np.any(dwis < 0.0):
@@ -300,7 +300,7 @@ if args.out_type != 'float':
 
 dwis = np.asarray(scale * dwis)
 
-print "\tWrite images to disk"
+print("\tWrite images to disk")
 hdr = nb.Nifti1Header()
 hdr.set_data_shape(dwis.shape)
 hdr.set_data_dtype(out_dtype)

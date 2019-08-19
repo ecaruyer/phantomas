@@ -10,8 +10,7 @@ References
 
 """
 import numpy as np
-from scipy.misc import factorial
-from scipy.special import lpmv, legendre, sph_harm
+from scipy.special import lpmv, legendre, sph_harm, factorial
 import hashlib
 
 
@@ -81,7 +80,7 @@ def dimension(order):
     R : int
         The dimension of the truncated spherical harmonics basis.
     """
-    return int((order + 1) * (order + 2) / 2)
+    return ((order + 1) * (order + 2)) // 2
 
 
 def j(l, m):

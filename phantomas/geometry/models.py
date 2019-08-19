@@ -2,7 +2,6 @@
 Model definition for the fibers geometry. A ``Fiber`` is a discrete
 representation of a white matter fiber bundle.
 """
-from numpy import *
 import numpy as np
 
 
