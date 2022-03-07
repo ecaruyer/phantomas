@@ -13,8 +13,9 @@
   },
   "isotropic_regions": {
     "region1": {
-      "radius" : 3.0,
-      "center": [0.0, 0.0, 0.0]
+      "radius" : 5.0,
+      "center": [0.0, 0.0, 0.0],
+      "volume_fraction": 0.4
     }
   }
 }
