@@ -191,7 +191,7 @@ def spherical_regions_volume_fraction(centers, radii, voxel_center,
         center_to_center = center_positions - center
         dst_to_center = (center_to_center ** 2).sum(1)
         volume_fraction[i] = dst_to_center < radius ** 2
-    return volume_fraction.sum(0) / dim_grid
+    return np.sum(volume_fraction, axis=1) / dim_grid
  
 
 def fibers_volume_fraction(fibers, intersect_codes, 
