@@ -229,8 +229,7 @@ gradient_theta = np.arccos(gradient_directions[:, 2])
 gradient_phi = np.arctan2(gradient_directions[:, 1], gradient_directions[:, 0])
 H = shm.matrix(gradient_theta, gradient_phi, order=order_sh)
 for bval in unique_bvals:
-    qnorm = np.sqrt(bval / (4 * np.pi**2 * tau))
-    rs = model.signal_convolution_sh(order_sh, qnorm, tau)
+    rs = model.signal_convolution_sh(order_sh, bval)
     indices = (gradient_bvals == bval)
     H[indices] *= rs[np.newaxis, :]
 

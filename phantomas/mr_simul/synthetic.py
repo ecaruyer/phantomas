@@ -29,7 +29,7 @@ class AxiallySymmetricModel():
 
     """
 
-    def signal(self, qnorms, thetas, tau=1 / (4 * np.pi**2)):
+    def signal(self, bvals, thetas):
         r"""
         Returns the simulated signal attenuation. The angles thetas correspond
         to the angles between the sampling directions and the principal axis
@@ -37,12 +37,10 @@ class AxiallySymmetricModel():
 
         Parameters
         ----------
-        qnorms : array-like shape (K, )
-            The norm of q vectors in mm\ :superscript:`-1`.
+	bvals : array-like shape (K, )
+	    B-values. 
         thetas : array-like, shape (K, )
             Angles between the sampling directions and the axis.
-        tau : double
-            Diffusion time in s.
 
         """
         raise NotImplementedError("The method signal must be implemented in "
@@ -64,8 +62,7 @@ class AxiallySymmetricModel():
                                   "subclasses")
 
 
-    def signal_convolution_sh(self, order, qnorm, tau=1 / (4 * np.pi**2),
-                              nb_samples=100):
+    def signal_convolution_sh(self, order, bval, nb_samples=100):
         r"""
         Returns the convolution operator in spherical harmonics basis, using
         the Funk-Hecke theorem as described in [1]_.
@@ -74,10 +71,8 @@ class AxiallySymmetricModel():
         ----------
         order : int
             The (even) spherical harmonics truncation order.
-        qnorm : double
-            The norm of q vector in mm\ :superscript:`-1`.
-        tau : double
-            The diffusion time in s.
+	bval : double
+	    B-value.
         nb_samples : int
             The number of samples controling the accuracy of the numerical
             integral.
@@ -97,8 +92,8 @@ class AxiallySymmetricModel():
         """
         cos_thetas = np.linspace(0, 1, nb_samples)
         thetas = np.arccos(cos_thetas)
-        qnorms = qnorm * np.ones(nb_samples)
-        fir = self.signal(qnorms, thetas, tau)
+        bvals = bval * np.ones(nb_samples)
+        fir = self.signal(bvals, thetas)
         H = np.zeros((order + 1, nb_samples))
         dim_sh = shm.dimension(order)
         for l in range(0, order + 1, 2):
@@ -131,7 +126,7 @@ class GaussianModel(AxiallySymmetricModel):
         self.lambda2 = lambda2
 
 
-    def signal(self, qnorms, thetas, tau=1 / (4 * np.pi**2)):
+    def signal(self, bvals, thetas):
         r"""Returns the simulated signal attenuation, following the Stejskal
         and Tanner [1]_ equation. The angles thetas correspond to the angles
         between the sampling directions and the principal axis of the
@@ -139,15 +134,12 @@ class GaussianModel(AxiallySymmetricModel):
 
         Parameters
         ----------
-        qnorms : array-like shape (K, )
-            The norm of q vectors in mm\ :superscript:`-1`.
+	bvals : array-like shape (K, )
+	    B-values. 
         thetas : array-like, shape (K, )
             Angles between the sampling directions and the axis.
-        tau : double
-            Diffusion time in the Stejskal and Tanner sequence in s.
 
         """
-        bvals = 4 * np.pi**2 * qnorms**2 * tau
         signal = np.exp(-bvals * self.lambda2)
         signal *= np.exp(-bvals * (self.lambda1 - self.lambda2) \
                          * np.cos(thetas)**2)
