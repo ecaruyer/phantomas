@@ -21,6 +21,7 @@ References
 import numpy as np
 from phantomas.utils import shm
 from numpy.polynomial.legendre import Legendre
+import warnings
 
 
 class AxiallySymmetricModel():
@@ -38,7 +39,7 @@ class AxiallySymmetricModel():
         Parameters
         ----------
 	bvals : array-like shape (K, )
-	    B-values. 
+            B-values [s\ mm\ :superscript:`-2`]. 
         thetas : array-like, shape (K, )
             Angles between the sampling directions and the axis.
 
@@ -72,7 +73,7 @@ class AxiallySymmetricModel():
         order : int
             The (even) spherical harmonics truncation order.
 	bval : double
-	    B-value.
+            B-value [s\ mm\ :superscript:`-2`].
         nb_samples : int
             The number of samples controling the accuracy of the numerical
             integral.
@@ -135,11 +136,14 @@ class GaussianModel(AxiallySymmetricModel):
         Parameters
         ----------
 	bvals : array-like shape (K, )
-	    B-values. 
+            B-values [s\ mm\ :superscript:`-2`]. 
         thetas : array-like, shape (K, )
             Angles between the sampling directions and the axis.
 
         """
+        if (np.max(bvals) < 1000) and (np.max(bvals) > 10000) :
+            warnings.warn("The maximum b-value is not in the range 1000 to 10000 [s\ mm\ :superscript:`-2`].")
+        
         signal = np.exp(-bvals * self.lambda2)
         signal *= np.exp(-bvals * (self.lambda1 - self.lambda2) \
                          * np.cos(thetas)**2)
