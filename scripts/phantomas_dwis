@@ -223,14 +223,12 @@ lambda1 = args.lambda1
 lambda2 = args.lambda2
 model = GaussianModel(lambda1, lambda2)
 signal_operators = {}
-tau = 50e-3  # diffusion time: 50ms
 unique_bvals = set(bvals[indices_dwis].tolist())
 gradient_theta = np.arccos(gradient_directions[:, 2])
 gradient_phi = np.arctan2(gradient_directions[:, 1], gradient_directions[:, 0])
 H = shm.matrix(gradient_theta, gradient_phi, order=order_sh)
 for bval in unique_bvals:
-    qnorm = np.sqrt(bval / (4 * np.pi**2 * tau))
-    rs = model.signal_convolution_sh(order_sh, qnorm, tau)
+    rs = model.signal_convolution_sh(order_sh, bval)
     indices = (gradient_bvals == bval)
     H[indices] *= rs[np.newaxis, :]
 
