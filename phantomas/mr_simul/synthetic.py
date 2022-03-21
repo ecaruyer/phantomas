@@ -141,7 +141,7 @@ class GaussianModel(AxiallySymmetricModel):
             Angles between the sampling directions and the axis.
 
         """
-        if (np.max(bvals) < 1000) and (np.max(bvals) > 10000) :
+        if (np.max(bvals) < 1000) or (np.max(bvals) > 10000) :
             warnings.warn("The maximum b-value is not in the range 1000 to 10000 [s\ mm\ :superscript:`-2`].")
         
         signal = np.exp(-bvals * self.lambda2)
