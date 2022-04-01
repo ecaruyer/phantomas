@@ -21,7 +21,6 @@ References
 import numpy as np
 from phantomas.utils import shm
 from numpy.polynomial.legendre import Legendre
-import warnings
 
 
 class AxiallySymmetricModel():
@@ -30,7 +29,7 @@ class AxiallySymmetricModel():
 
     """
 
-    def signal(self, bvals, thetas):
+    def signal(self, bvals, thetas, bperps=None):
         r"""
         Returns the simulated signal attenuation. The angles thetas correspond
         to the angles between the sampling directions and the principal axis
@@ -42,6 +41,8 @@ class AxiallySymmetricModel():
             B-values [s\ mm\ :superscript:`-2`]. 
         thetas : array-like, shape (K, )
             Angles between the sampling directions and the axis.
+        bperp : double
+            b_perpendicular if we use cylindrical b-tensors [s\ mm\ :superscript:`-2`]. 
 
         """
         raise NotImplementedError("The method signal must be implemented in "
@@ -63,7 +64,7 @@ class AxiallySymmetricModel():
                                   "subclasses")
 
 
-    def signal_convolution_sh(self, order, bval, nb_samples=100):
+    def signal_convolution_sh(self, order, bval, nb_samples=100, bperp=None):
         r"""
         Returns the convolution operator in spherical harmonics basis, using
         the Funk-Hecke theorem as described in [1]_.
@@ -77,6 +78,8 @@ class AxiallySymmetricModel():
         nb_samples : int
             The number of samples controling the accuracy of the numerical
             integral.
+        bperp : double
+            b_perpendicular if we use cylindrical b-tensors [s\ mm\ :superscript:`-2`]. 
 
         Note
         ----
@@ -94,7 +97,11 @@ class AxiallySymmetricModel():
         cos_thetas = np.linspace(0, 1, nb_samples)
         thetas = np.arccos(cos_thetas)
         bvals = bval * np.ones(nb_samples)
-        fir = self.signal(bvals, thetas)
+        if bperp == None :
+            fir = self.signal(bvals, thetas)
+        else :
+            bperps = bperp * np.ones(nb_samples)
+            fir = self.signal(bvals, thetas, bperps=bperps)
         H = np.zeros((order + 1, nb_samples))
         dim_sh = shm.dimension(order)
         for l in range(0, order + 1, 2):
@@ -127,7 +134,7 @@ class GaussianModel(AxiallySymmetricModel):
         self.lambda2 = lambda2
 
 
-    def signal(self, bvals, thetas):
+    def signal(self, bvals, thetas, bperps=None):
         r"""Returns the simulated signal attenuation, following the Stejskal
         and Tanner [1]_ equation. The angles thetas correspond to the angles
         between the sampling directions and the principal axis of the
@@ -139,13 +146,20 @@ class GaussianModel(AxiallySymmetricModel):
             B-values [s\ mm\ :superscript:`-2`]. 
         thetas : array-like, shape (K, )
             Angles between the sampling directions and the axis.
+        bperps : array-like shape (K, )
+            b_perpendicular if we use cylindrical b-tensors [s\ mm\ :superscript:`-2`]. 
 
         """
-        if (np.max(bvals) < 1000) or (np.max(bvals) > 10000) :
-            warnings.warn("The maximum b-value is not in the range 1000 to 10000 [s\ mm\ :superscript:`-2`].")
-        
-        signal = np.exp(-bvals * self.lambda2)
-        signal *= np.exp(-bvals * (self.lambda1 - self.lambda2) \
-                         * np.cos(thetas)**2)
+
+        if type(bperps) == type(None) :
+            signal = np.exp(-bvals * self.lambda2)
+            signal *= np.exp(-bvals * (self.lambda1 - self.lambda2) \
+                             * np.cos(thetas)**2)
+        else :
+            signal = np.exp(-(bvals - 3 * bperps) * (self.lambda1 - self.lambda2) \
+                            * np.cos(thetas)**2)
+            signal *= np.exp(-(bvals - 3 * bperps) * self.lambda2)
+            signal *= np.exp(-bperps * (self.lambda1 - self.lambda2))
+            signal *= np.exp(-3 * bperps * self.lambda2)
 
         return signal
