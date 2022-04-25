@@ -105,6 +105,7 @@ for i in range(nb_fibers):
 
 fibers_mask = np.logical_and(np.logical_not(csf_mask),
                              np.any(fiber_masks > 0, axis=-1))
+fibers_mask = np.logical_and(fibers_mask, gm_mask > 0)
 fibers_mask = np.asarray(fibers_mask, dtype=np.uint8)
 fibers_mask_img = nib.Nifti1Image(fibers_mask, affine)
 nib.save(fibers_mask_img, os.path.join(args.out_dir, "fibers.nii.gz"))
