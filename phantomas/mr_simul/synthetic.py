@@ -151,7 +151,7 @@ class GaussianModel(AxiallySymmetricModel):
 
         """
 
-        if type(bperps) == type(None) :
+        if bperps is None :
             signal = np.exp(-bvals * self.lambda2)
             signal *= np.exp(-bvals * (self.lambda1 - self.lambda2) \
                              * np.cos(thetas)**2)

@@ -1,4 +1,4 @@
-from phantomas.mr_simul.synthetic import *
+from phantomas.mr_simul.synthetic import GaussianModel
 import unittest
 import numpy as np
 
