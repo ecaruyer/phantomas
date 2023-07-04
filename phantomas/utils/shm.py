@@ -191,8 +191,8 @@ class _CachedMatrix():
         dim_sh = dimension(order)
         ls = [l for L in range(0, order + 1, 2) for l in [L] * (2*L + 1)]
         ms = [m for L in range(0, order + 1, 2) for m in range(-L, L+1)]
-        ls = np.asarray(ls, dtype=np.int)[np.newaxis, :]
-        ms = np.asarray(ms, dtype=np.int)[np.newaxis, :]
+        ls = np.asarray(ls, dtype=int)[np.newaxis, :]
+        ms = np.asarray(ms, dtype=int)[np.newaxis, :]
         sh = sph_harm(np.abs(ms), ls,
                       phi[:, np.newaxis], theta[:, np.newaxis])
         H = np.where(ms > 0, sh.imag, sh.real)
