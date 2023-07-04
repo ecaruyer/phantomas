@@ -41,7 +41,7 @@ def _random_correlated_image(mean, sigma, image_shape, alpha=0.3, rng=None):
         corr_j = []
         for i, j, k in [(0, 0, 0), neighbor]:
             d2 = 1.0 * (i*i + j*j + k*k)
-            ind = np.asarray(np.mgrid[0:dim_x-i, 0:dim_y-j, 0:dim_z-k], dtype=np.int)
+            ind = np.asarray(np.mgrid[0:dim_x-i, 0:dim_y-j, 0:dim_z-k], dtype=int)
             ind = ind.reshape((3, (dim_x - i) * (dim_y - j) * (dim_z - k)))
             corr_i.extend(np.ravel_multi_index(ind, (dim_x, dim_y, dim_z)).tolist())
             corr_j.extend(np.ravel_multi_index(ind + np.asarray([i, j, k])[:, None],
