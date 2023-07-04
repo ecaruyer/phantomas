@@ -91,8 +91,8 @@ def compute_fiber_masks(fibers, voxel_size, image_size):
             point_to_corners = corner_positions - point
             dst_to_corners = (point_to_corners ** 2).sum(-1)
 
-            intersected = np.zeros((dim_x, dim_y, dim_z), dtype=np.bool)
-            filled = np.ones((dim_x, dim_y, dim_z), dtype=np.bool)
+            intersected = np.zeros((dim_x, dim_y, dim_z), dtype=bool)
+            filled = np.ones((dim_x, dim_y, dim_z), dtype=bool)
             for x, y, z in corner_indices:
                 mask_corner = dst_to_corners[x:dim_x+x, y:dim_y+y, z:dim_z+z] \
                               < radius ** 2

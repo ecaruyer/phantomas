@@ -48,7 +48,7 @@ def compute_directions(fibers, tangents, fiber_radii, voxel_center, voxel_size,
                      + voxel_center
     center_positions = np.ascontiguousarray(center_positions)
     total_nb_fibers = np.zeros(dim_grid)
-    compartments = np.zeros((nb_fibers, dim_grid), dtype=np.bool)
+    compartments = np.zeros((nb_fibers, dim_grid), dtype=bool)
     directions = np.zeros((nb_fibers, dim_grid, 3), dtype=np.double)
     for i, fiber, tangent, fiber_radius in zip(range(nb_fibers), fibers,
                                                tangents, fiber_radii):
