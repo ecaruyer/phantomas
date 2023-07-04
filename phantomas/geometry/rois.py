@@ -39,7 +39,7 @@ def spherical_shell_mask(voxel_size, image_size, center, radius,
     corner_indices = [[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1],
                       [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]]
 
-    mask_shell = np.zeros((dim_x, dim_y, dim_z), dtype=np.bool)
+    mask_shell = np.zeros((dim_x, dim_y, dim_z), dtype=bool)
 
     for x, y, z in corner_indices:
         mask_corner_in_out = dst_to_corners[x:dim_x+x, y:dim_y+y, z:dim_z+z] \
@@ -103,7 +103,7 @@ def _merge_patches(endpoints, radii):
             label_indices.append([i])
     nb_labels = len(label_indices)
 
-    connectivity_matrix = np.zeros((nb_labels, nb_labels), dtype=np.bool)
+    connectivity_matrix = np.zeros((nb_labels, nb_labels), dtype=bool)
     for i in range(nb_labels):
         patches_i = label_indices[i]
         for j in range(i):
